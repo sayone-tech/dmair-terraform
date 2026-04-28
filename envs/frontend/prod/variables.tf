@@ -142,7 +142,7 @@ variable "CDN_Describtion" {
 
 variable "domain" {
   type        = string
-  default     =  ""
+  default     = ""
   description = "custom domain name to add cloudfront"
 }
 
