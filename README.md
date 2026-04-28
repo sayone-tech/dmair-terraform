@@ -53,8 +53,8 @@ infra_code/
 **Purpose:** Headless CMS backend  
 **Region:** us-west-2  
 **Domains:**
-- CMS: `cms.dmair.net`
-- CDN: `strapi-cdn.dmair.net`
+- CMS: `cms.flydmair.com`
+- CDN: `strapi-cdn.flydmair.com`
 
 **Infrastructure:**
 - EC2: t3.small (Ubuntu 22.04) with Elastic IP
@@ -70,7 +70,7 @@ infra_code/
 
 **Purpose:** Pre-production testing  
 **Region:** us-west-2  
-**Domain:** `staging.dmair.net`
+**Domain:** `staging.flydmair.com`
 
 **Infrastructure:**
 - S3: Static site hosting
@@ -87,7 +87,7 @@ infra_code/
 
 **Purpose:** Production website  
 **Region:** us-west-2  
-**Domains:** `www.dmair.net`, `dmair.net`
+**Domains:** `www.flydmair.com`, `flydmair.com`
 
 **Infrastructure:**
 - S3: Static site hosting
