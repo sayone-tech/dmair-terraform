@@ -1,0 +1,51 @@
+#!/bin/bash
+set -euo pipefail
+
+# ----------------------------------------------------
+# Add SSH key for ubuntu user
+# ----------------------------------------------------
+mkdir -p /home/ubuntu/.ssh
+chmod 700 /home/ubuntu/.ssh
+
+printf "%s\n" "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQCynl2Qob9tiv8w8pu3rWmOPdZ6eR7fBIEBiBVTWJoBguNZQueBAE4qFJVGRkEUQTDJh+nGZ0tVTczk0ZpUPW7/P8foXQTAZThNCNBoSwjsOwHSoGhTL2uMd6eBHNOrzmNmDoCRp3MlCF8Q818/zzYJFUURyLpNRhOlbmfvJtVQVA7ltcqPU3IOeXqBHCSfjnCEfsKTzDKKrenG+8/FvluceQbIuYrwzA6iKhG8yrtskKfHeZbkwwuMhPQ4CtPTBTqkeq30qKUzAosvBLf2aZYtjcp6HGgFu1R5c/7cD8SFwkO418viRQZoMTCfQiMDoHBex4Y6mbA1LT8DOWcwGSLEq1F8OV5Pq6uSbewRuj1nRc6S/VsVOiCkKxhJxHdazw8BJE+72qogs7HlhQWhho9vQg80BZ1xTzaMettpqFyqskk259flNzGAkon72UbUAcAjLRwRgWKc/WTSxsHjCAy1J2tKfjiLxYpaGpoK67o30sq2943mFDGh+Bz7N7X6WMA7vTOxdYNhJur9Aj5OVDz91LD9doI9YLT1+F8PQbcNgJYWo8BN2zOCS/teP4Y+F8qIzJir9EVwJwNAjPMhYEJjh3SGW6GKY79NfNYpWiRMinyBkXx6sh/fMmTphtJb9N7y6Z5R+s3MJuiD32faAhA5DQg6rI+XZNmV/giuGNltJQ== jenkins-server" \
+  > /home/ubuntu/.ssh/authorized_keys
+
+chmod 600 /home/ubuntu/.ssh/authorized_keys
+chown -R ubuntu:ubuntu /home/ubuntu/.ssh
+
+echo "-----------------------------------------------"
+echo "Installing Docker and Docker Compose"
+echo "-----------------------------------------------"
+
+sudo apt -y update
+sudo apt install -y apt-transport-https ca-certificates curl software-properties-common unzip
+
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+    | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] \
+  https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
+  | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+sudo apt -y update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+sudo systemctl enable --now docker
+sudo groupadd docker || true
+sudo usermod -aG docker ubuntu
+
+
+echo "-----------------------------------------------"
+echo "Installing AWS CLI v2"
+echo "-----------------------------------------------"
+
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip -o awscliv2.zip
+sudo ./aws/install
+rm -rf aws awscliv2.zip
+
+echo "AWS CLI version:"
+aws --version
+
+echo "Setup completed successfully."
