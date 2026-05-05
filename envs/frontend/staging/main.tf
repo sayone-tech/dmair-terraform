@@ -106,3 +106,48 @@ module "github_actions_user" {
     module.github_actions_policies.policy_arns_map
   )
 }
+
+module "S3_Website_dist" {
+  source                         = "../../../modules/s3"
+  APP_NAME                       = "${var.APP_NAME}-dist"
+  ENV                            = var.ENV
+  tags                           = var.tags
+  S3_cors_Allowed_Headers        = var.S3_cors_Allowed_Headers
+  S3_cors_Allowed_Methods        = var.S3_cors_Allowed_Methods
+  S3_cors_Allowed_Origins        = var.S3_cors_Allowed_Origins
+  S3_cors_Expose_Headers         = var.S3_cors_Expose_Headers
+  S3_cors_Max_Age                = var.S3_cors_Max_Age
+  WEBSITE_index_file             = var.WEBSITE_index_file
+  WEBSITE_error_file             = var.WEBSITE_error_file
+  AWS_S3_Bucket_ACL_TYPE         = var.AWS_S3_Bucket_ACL_TYPE
+  AWS_S3_block_public_acls       = var.AWS_S3_block_public_acls
+  AWS_S3_block_public_policy     = var.AWS_S3_block_public_policy
+  AWS_S3_ignore_public_acls      = var.AWS_S3_ignore_public_acls
+  AWS_S3_restrict_public_buckets = var.AWS_S3_restrict_public_buckets
+
+  enable_website    = false
+  enable_versioning = false
+  enable_encryption = true
+}
+
+module "cloudfront_dist" {
+  source = "../../../modules/cloudfront"
+
+  s3_domain                 = module.S3_Website_dist.S3-Bucket-Domain
+  s3_regional_domain        = module.S3_Website_dist.S3-Bucket-Domain
+  s3_arn                    = module.S3_Website_dist.S3-Bucket-ARN
+  s3_name                   = module.S3_Website_dist.S3-Bucket-NAME
+  APP_NAME                  = "${var.APP_NAME}-dist"
+  ENV                       = var.ENV
+  tags                      = var.tags
+  S3_Origin_ID              = "${var.S3_Origin_ID}-dist"
+  CDN_Default_Root          = var.CDN_Default_Root
+  CDN_Allowed_Methods       = var.CDN_Allowed_Methods
+  CDN_Cached_Methods        = var.CDN_Cached_Methods
+  CDN_Custom_Error_Response = var.CDN_Custom_Error_Response
+  CDN_Describtion           = "CDN for staging dist hosting"
+
+  acm_certificate             = "" # Use default cloudfront certificate
+  domain                      = "" # No custom domain
+  viewer_request_function_arn = ""
+}
