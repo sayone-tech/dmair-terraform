@@ -41,3 +41,15 @@ output "cloudfront_basic_auth_function_name" {
   description = "Name of the CloudFront basic auth function"
   value       = try(module.cloudfront_basic_auth[0].function_name, null)
 }
+
+output "dist_s3_bucket_name" {
+  value = module.S3_Website_dist.S3-Bucket-NAME
+}
+
+output "dist_cloudfront_domain_name" {
+  value = module.cloudfront_dist.cdn_distribution_domain_name
+}
+
+output "dist_cloudfront_id" {
+  value = module.cloudfront_dist.cdn_distribution_id
+}
