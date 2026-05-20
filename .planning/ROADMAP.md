@@ -7,7 +7,7 @@
 
 ## Phases
 
-- [ ] **Phase 1: Bootstrap State Backend** - Self-describing state backend + DynamoDB locking wired into every existing stack (zero-change-plan gated)
+- [ ] **Phase 1: Bootstrap State Backend** - Self-describing state backend + S3-native state locking wired into every existing stack (zero-change-plan gated)
 - [ ] **Phase 2: Refactor to live/ Layout** - `envs/<x>` → `live/dmair/<env>/<component>` via `moved {}` blocks, README updated, staging slot reserved
 - [ ] **Phase 3: dmair-backend Staging Slot** - `live/dmair/staging/backend/` stack with EC2 + Elastic IP + DNS + tag/prefix-scoped OIDC role
 - [ ] **Phase 4: CI/CD Pipeline + OIDC** - PR-gated Lint + Plan; merge-gated Apply per stack via GitHub Environments; OIDC trust provider + role inventory in `OIDC.md`
@@ -15,22 +15,22 @@
 ## Phase Details
 
 ### Phase 1: Bootstrap State Backend
-**Goal:** State backend is self-describing IaC and concurrent-apply-safe; every existing stack writes through the DynamoDB lock table without changing any managed resource.
+**Goal:** State backend is self-describing IaC and concurrent-apply-safe; every existing stack writes through S3-native state locking (use_lockfile = true) without changing any managed resource.
 **Mode:** mvp
 **Depends on:** Nothing (first phase)
 **Requirements:** BOOTSTRAP-01, BOOTSTRAP-02, BOOTSTRAP-03
 **Success Criteria** (what must be TRUE):
-  1. `terraform plan` in `bootstrap/` reports "No changes" after the `dmair-terraform-prod` bucket is imported and the `dmair-terraform-locks` DynamoDB table is applied (operator verifies: `cd bootstrap && terraform plan` prints `No changes. Your infrastructure matches the configuration.`).
-  2. `terraform plan` in each of `envs/strapi`, `envs/frontend/prod`, `envs/frontend/staging` reports "No changes" after `dynamodb_table = "dmair-terraform-locks"` is added to `backend.tf` and `terraform init -reconfigure` is run.
-  3. Concurrent `terraform apply` from two terminals in the same stack blocks the second one on the DynamoDB lock: operator runs `terraform apply` in terminal A and immediately again in terminal B; terminal B prints `Acquiring state lock. This may take a few moments...` and waits until terminal A releases.
-  4. `aws dynamodb describe-table --table-name dmair-terraform-locks --region us-west-2` returns a table with `LockID` (String) as the hash key and `ACTIVE` status.
+  1. `terraform plan` in `bootstrap/` reports "No changes" after the `dmair-terraform-prod` bucket is imported and `use_lockfile = true` is set on the bootstrap backend (operator verifies: `cd bootstrap && terraform plan` prints `No changes. Your infrastructure matches the configuration.`). The bootstrap stack creates no AWS resources — it is a pure import-only zero-change verification.
+  2. `terraform plan` in each of `envs/strapi`, `envs/frontend/prod`, `envs/frontend/staging` reports "No changes" after `use_lockfile = true` is added to `backend.tf` and `terraform init -reconfigure` is run.
+  3. Concurrent `terraform apply` from two terminals in the same stack blocks the second one on the S3 state lock: operator runs `terraform apply` in terminal A and immediately again in terminal B; terminal B prints `Acquiring state lock. This may take a few moments...` and waits until terminal A releases.
+  4. During a held `terraform apply` against `envs/strapi`, `aws --profile dmair s3 ls s3://dmair-terraform-prod/strapi/` shows a `strapi/terraform.tfstate.tflock` sentinel object. After the apply prompt is answered (or Ctrl-C), the `.tflock` object disappears within seconds (operator verifies: re-run `aws s3 ls` and observe the object is gone).
 **Plans:** 6 plans
   - [ ] 01-01-PLAN.md — Operator preconditions + live-state capture (BOOTSTRAP-01 prerequisite)
-  - [ ] 01-02-PLAN.md — Create bootstrap/ stack, import bucket + create lock table, zero-change verify (BOOTSTRAP-01)
+  - [ ] 01-02-PLAN.md — Create bootstrap/ stack, import bucket, enable use_lockfile on bootstrap backend, zero-change verify (BOOTSTRAP-01)
   - [ ] 01-03-PLAN.md — Rewire envs/strapi/backend.tf (BOOTSTRAP-02, 1/3)
   - [ ] 01-04-PLAN.md — Rewire envs/frontend/prod/backend.tf (BOOTSTRAP-02, 2/3)
   - [ ] 01-05-PLAN.md — Rewire envs/frontend/staging/backend.tf (BOOTSTRAP-02, 3/3)
-  - [ ] 01-06-PLAN.md — Two-terminal concurrent-lock verification + describe-table + VERIFICATION.md (BOOTSTRAP-03)
+  - [ ] 01-06-PLAN.md — Two-terminal concurrent-lock verification + .tflock object inspection + VERIFICATION.md (BOOTSTRAP-03)
 
 ### Phase 2: Refactor to live/ Layout
 **Goal:** Folder layout is migrated to `live/dmair/<env>/<component>`, all three existing live stacks still plan clean, the staging backend slot directory exists, and the README reflects the new reality.
@@ -42,7 +42,7 @@
   2. `terraform plan` in `live/dmair/prod/strapi`, `live/dmair/prod/frontend`, and `live/dmair/staging/frontend` each report "No changes" — every moved resource is covered by a `moved {}` block. This is the hard gate; any non-empty plan diff fails the phase.
   3. State keys at `s3://dmair-terraform-prod/strapi/terraform.tfstate`, `s3://dmair-terraform-prod/frontend/prod/terraform.tfstate`, `s3://dmair-terraform-prod/frontend/staging/terraform.tfstate` are unchanged (operator verifies: `aws s3 ls s3://dmair-terraform-prod/ --recursive` shows the same three keys at the same paths).
   4. `live/dmair/staging/` directory exists with at minimum a placeholder README, reserved for the dmair-backend slot.
-  5. `README.md` describes the new `live/<project>/<env>/<component>` layout, the `bootstrap/` stack, and the DynamoDB lock table; the legacy "company-website production stack" framing is gone and the three live stacks (strapi CMS, frontend prod, frontend staging) are each named explicitly.
+  5. `README.md` describes the new `live/<project>/<env>/<component>` layout, the `bootstrap/` stack, and S3-native state locking (use_lockfile = true); the legacy "company-website production stack" framing is gone and the three live stacks (strapi CMS, frontend prod, frontend staging) are each named explicitly.
 **Plans:** TBD
 
 ### Phase 3: dmair-backend Staging Slot
