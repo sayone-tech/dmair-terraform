@@ -1,33 +1,37 @@
 # Phase 1: Bootstrap State Backend - Research
 
 **Researched:** 2026-05-20
-**Domain:** Terraform state-backend bootstrap — S3 bucket import + DynamoDB lock table + per-stack backend rewire under AWS provider `hashicorp/aws` 5.91.0
+**Domain:** Terraform state-backend bootstrap — S3 bucket import + S3-native state locking + per-stack backend rewire under AWS provider `hashicorp/aws` 5.91.0
 **Confidence:** HIGH (provider docs + AWS-side live inspection corroborated)
+
+> **Revision note (2026-05-20, afternoon):** This research was written assuming a DynamoDB lock table per the morning's CONTEXT.md. The operator switched the chosen approach to S3-native locking (`use_lockfile = true`) the same afternoon. The text below has been edited to reflect that switch in the **Chosen Approach** sections (Summary, Standard Stack, Architecture Patterns, Code Examples). DynamoDB-flavored content is preserved in the **Alternatives Considered** and **Pitfalls** sections as part of the audit trail. Where a pitfall (e.g., Pitfall 1 — PAY_PER_REQUEST under DynamoDB) no longer applies under the chosen approach, the pitfall remains documented but is now annotated `[no longer applies under chosen approach — preserved for audit trail]`.
 
 ## Summary
 
-Phase 1 is a two-step infrastructure-as-code bootstrap with a hard zero-change-plan invariant on three existing live stacks. The technical work is small (one new `bootstrap/` stack, three one-line edits to existing `backend.tf` files) but the foot-guns are concentrated: (1) the HCL for the four imported S3 sub-resources must mirror live AWS-side configuration verbatim or BOOTSTRAP-01's "No changes" gate fails, (2) `aws_dynamodb_table` under `PAY_PER_REQUEST` will be rejected by AWS if `read_capacity` / `write_capacity` are declared, and (3) DynamoDB-based locking is **deprecated** in Terraform 1.11+ — `dynamodb_table = "..."` still works under the locked CONTEXT decision but emits a deprecation warning that the planner must expect in plan output and not mistake for drift.
+Phase 1 is a two-step infrastructure-as-code bootstrap with a hard zero-change-plan invariant on three existing live stacks. The technical work is small (one new `bootstrap/` stack, three two-line edits to existing env files) but the foot-guns are concentrated: (1) the HCL for the four imported S3 sub-resources must mirror live AWS-side configuration verbatim or BOOTSTRAP-01's "No changes" gate fails, (2) Terraform 1.10+ supports S3-native state locking via `use_lockfile = true`; this is the chosen mechanism for this phase, replacing the morning's DynamoDB plan. Workstations must run Terraform ≥ 1.10; this phase pins `required_version = "~> 1.15"` in every `providers.tf` (workstation runs 1.15.3).
 
-The research established that the operator cannot inspect the live `dmair-terraform-prod` bucket configuration from this machine (the local `fly-dmair` profile is read-list only — `s3:GetBucketVersioning`, `s3:GetEncryptionConfiguration`, `s3:GetBucketPublicAccessBlock`, etc. all return `AccessDenied`). A capture-then-translate task using a more-privileged operator profile is therefore a hard prerequisite to writing HCL, not a parallel research step. The `dmair-terraform-locks` table does not exist yet — confirmed by `DescribeTable` returning `ResourceNotFoundException`.
+The research established that the operator cannot inspect the live `dmair-terraform-prod` bucket configuration from this machine (the local `fly-dmair` profile is read-list only — `s3:GetBucketVersioning`, `s3:GetEncryptionConfiguration`, `s3:GetBucketPublicAccessBlock`, etc. all return `AccessDenied`). A capture-then-translate task using a more-privileged operator profile is therefore a hard prerequisite to writing HCL, not a parallel research step.
 
-**Primary recommendation:** Sequence the bootstrap as three discrete operator-gated steps in a single `bootstrap/` stack: (1) human runs three `aws s3api` inspections against `dmair-terraform-prod` and records output, (2) plan writes inline HCL that mirrors the captured values exactly, plus the DynamoDB table, plus four `import {}` blocks (Terraform 1.5+ declarative import — safer than CLI imports because it's plan-visible and review-able), (3) `terraform apply` from a fresh `terraform init` creates the table AND adopts the bucket in one transaction. After zero-change-plan verification on `bootstrap/`, rewire the three live `backend.tf` files one at a time, separated by zero-change-plan checkpoints, per CONTEXT D-11.
+**Primary recommendation:** Sequence the bootstrap as three discrete operator-gated steps in a single `bootstrap/` stack: (1) human runs three `aws s3api` inspections against `dmair-terraform-prod` and records output, (2) plan writes inline HCL that mirrors the captured values exactly, plus four `import {}` blocks (Terraform 1.5+ declarative import — safer than CLI imports because it's plan-visible and review-able), (3) `terraform apply` from a fresh `terraform init` adopts the bucket in one transaction (no CREATEs — only the 4 S3 IMPORTs). After zero-change-plan verification on `bootstrap/`, rewire the three live `backend.tf` files one at a time (adding `use_lockfile = true`), with the sibling `providers.tf` gaining `required_version = "~> 1.15"`, separated by zero-change-plan checkpoints, per CONTEXT D-11.
 
 ## Architectural Responsibility Map
 
 | Capability | Primary Tier | Secondary Tier | Rationale |
 |------------|-------------|----------------|-----------|
 | S3 state bucket (existing — adopt via import) | Storage / Persistence | — | Pre-existing AWS resource, becomes IaC-managed in `bootstrap/` |
-| DynamoDB lock table (greenfield) | Coordination / Locking | — | New resource provisioned by `bootstrap/`; referenced by string literal from every other stack's backend block |
-| Per-stack remote state config | Terraform-CLI control plane | — | `backend "s3" { ... dynamodb_table = "..." }` in `envs/*/backend.tf`; no resource graph involvement |
-| Concurrent-apply prevention | Coordination / Locking | Terraform-CLI control plane | Terraform CLI acquires/releases lock via DynamoDB `PutItem`/`DeleteItem` keyed on `LockID = "<bucket>/<key>-md5"` |
-| Bootstrap stack's own state | Storage / Persistence (self-referential — same bucket) | — | Per CONTEXT D-01: bootstrap state lives at `s3://dmair-terraform-prod/bootstrap/terraform.tfstate`, unlocked. Bootstrap is the only stack without a `dynamodb_table` line. |
+| S3 .tflock sentinel object (per-state-key, written by Terraform) | Coordination / Locking | — | Written automatically by Terraform 1.10+ when `use_lockfile = true` is set on `backend "s3"`; no additional AWS resource needed. |
+| Per-stack remote state config | Terraform-CLI control plane | — | `backend "s3" { ... use_lockfile = true }` in `envs/*/backend.tf`; no resource graph involvement |
+| Concurrent-apply prevention | Coordination / Locking | Terraform-CLI control plane | Terraform CLI acquires/releases lock via S3 `PutObject`/`DeleteObject` on a `<state-key>.tflock` sentinel object |
+| Bootstrap stack's own state | Storage / Persistence (self-referential — same bucket) | — | Per CONTEXT D-01 (revised): bootstrap state lives at `s3://dmair-terraform-prod/bootstrap/terraform.tfstate`, locked via the same `.tflock` sentinel mechanism as every other stack. |
 
 ## User Constraints (from CONTEXT.md)
+
+> **Revised 2026-05-20 PM — see 01-CONTEXT.md "Previously Assumed" section for the original DynamoDB-flavored decisions.**
 
 ### Locked Decisions
 
 **Bootstrap stack's own state**
-- **D-01:** Bootstrap state lives at `s3://dmair-terraform-prod/bootstrap/terraform.tfstate` (self-referential — uses the same bucket it imports). No `dynamodb_table` on the bootstrap backend itself — it stays unlocked.
+- **D-01 (revised):** Bootstrap state lives at `s3://dmair-terraform-prod/bootstrap/terraform.tfstate` (self-referential — uses the same bucket it imports). `use_lockfile = true` on bootstrap's own backend — bootstrap is locked via the S3-native `.tflock` sentinel, identical to every other stack.
 - **D-02:** Bootstrap stack uses the same provider config as the live stacks: `hashicorp/aws` pinned to `5.91.0`, profile `dmair`, `shared_credentials_files = ["~/.aws/credentials"]`, region `us-west-2`.
 
 **S3 bucket import scope**
@@ -35,16 +39,16 @@ The research established that the operator cannot inspect the live `dmair-terraf
 - **D-04:** Sub-resources NOT brought under IaC in this phase: bucket policy, lifecycle rules, logging, replication, ownership controls, CORS, tagging beyond what already exists. Drift here is accepted in v1.
 - **D-05:** Research step REQUIRED before HCL is written — operator MUST `aws s3api get-bucket-versioning`, `get-bucket-encryption`, and `get-public-access-block` against `dmair-terraform-prod` and copy values verbatim into HCL.
 
-**DynamoDB lock table shape**
-- **D-06:** `aws_dynamodb_table.terraform_locks` — `name = "dmair-terraform-locks"`, hash key `LockID` (String), `billing_mode = "PAY_PER_REQUEST"`.
-- **D-07:** `point_in_time_recovery` is **off**.
-- **D-08:** `deletion_protection_enabled = true`.
-- **D-09:** Server-side encryption stays at the AWS-managed default (no customer KMS key).
-- **D-10:** Tagging: `App_Name = "dmair-terraform"`, `Env_Type = "bootstrap"`.
+**Lock mechanism**
+- **D-06 (revised):** S3-native state locking via `use_lockfile = true`; no DynamoDB table provisioned.
+- **D-07 (Obsolete — see 01-CONTEXT.md Previously Assumed).**
+- **D-08 (Obsolete — see 01-CONTEXT.md Previously Assumed).**
+- **D-09 (Obsolete — see 01-CONTEXT.md Previously Assumed).**
+- **D-10 (Obsolete — see 01-CONTEXT.md Previously Assumed).**
 
 **Backend rewire rollout sequencing**
-- **D-11:** Three live backends rewired **one stack at a time, separate commits, with a zero-change-plan checkpoint between each**. Order: `envs/strapi` → `envs/frontend/prod` → `envs/frontend/staging`.
-- **D-12:** No `terraform init -migrate-state` expected — adding a lock table is metadata-only reconfigure. If `init -reconfigure` prompts for `-migrate-state`, stop and investigate.
+- **D-11 (revised):** Three live backends rewired **one stack at a time, separate commits, with a zero-change-plan checkpoint between each**. Order: `envs/strapi` → `envs/frontend/prod` → `envs/frontend/staging`. Each stack's rewire inserts `use_lockfile = true` in `backend.tf` AND `required_version = "~> 1.15"` in `providers.tf`, in the same per-stack order.
+- **D-12:** No `terraform init -migrate-state` expected — toggling the lock mechanism is a metadata-only reconfigure. If `init -reconfigure` prompts for `-migrate-state`, stop and investigate.
 - **D-13:** Each rewire commit independently revertable.
 
 **BOOTSTRAP-03 verification**
@@ -53,7 +57,7 @@ The research established that the operator cannot inspect the live `dmair-terraf
 
 ### Claude's Discretion
 
-- HCL formatting + naming inside `bootstrap/` follows the repo's existing conventions: two-space indentation, `aws_dynamodb_table.this` / `aws_s3_bucket.this` resource labels, `App_Name` / `Env_Type` variable naming style, `terraform.tfvars` for values. Planner can choose single `main.tf` (preferred) vs split files.
+- HCL formatting + naming inside `bootstrap/` follows the repo's existing conventions: two-space indentation, `aws_s3_bucket.this` resource labels, `App_Name` / `Env_Type` variable naming style, `terraform.tfvars` for values. Planner can choose single `main.tf` (preferred) vs split files.
 - The bootstrap stack does NOT reuse any module from `modules/`.
 
 ### Deferred Ideas (OUT OF SCOPE)
@@ -68,8 +72,8 @@ The research established that the operator cannot inspect the live `dmair-terraf
 
 | ID | Description | Research Support |
 |----|-------------|------------------|
-| BOOTSTRAP-01 | `bootstrap/` stack imports `dmair-terraform-prod` and declares `dmair-terraform-locks` DynamoDB table | Provider 5.91.0 import IDs + HCL shapes documented below (sections 1, 2). Live-state capture procedure documented (section 4). |
-| BOOTSTRAP-02 | Every existing `backend.tf` wired with `dynamodb_table = "dmair-terraform-locks"`; `terraform init -reconfigure`; zero-change plan | Backend block argument verified (section 3). `init -reconfigure` semantics confirmed (section 3). |
+| BOOTSTRAP-01 | `bootstrap/` stack imports `dmair-terraform-prod` and enables `use_lockfile = true` on its own backend | Provider 5.91.0 import IDs + HCL shapes documented below (sections 1, 2). Live-state capture procedure documented (section 4). |
+| BOOTSTRAP-02 | Every existing `backend.tf` wired with `use_lockfile = true`; sibling `providers.tf` pins `required_version = "~> 1.15"`; `terraform init -reconfigure`; zero-change plan | Backend block argument verified (section 3). `init -reconfigure` semantics confirmed (section 3). |
 | BOOTSTRAP-03 | Concurrent apply blocked by lock | Exact CLI message verified (section 9). Lock-recovery via `terraform force-unlock` documented (section 9). |
 
 ## Standard Stack
@@ -78,7 +82,7 @@ The research established that the operator cannot inspect the live `dmair-terraf
 
 | Library | Version | Purpose | Why Standard |
 |---------|---------|---------|--------------|
-| Terraform CLI | ≥ 1.5 (recommended 1.5–1.10 for this phase) | Apply + state mgmt | 1.5+ required for `import {}` blocks (declarative import). 1.11+ deprecates `dynamodb_table` — works but warns. See section 5 + Pitfall 6. |
+| Terraform CLI | ≥ 1.10 (recommended `~> 1.15`) | Apply + state mgmt + S3-native locking (use_lockfile requires 1.10+) | 1.10+ required for S3-native state locking. |
 | `hashicorp/aws` provider | `5.91.0` (exact pin) | All AWS resource CRUD | Pinned across all three live stacks (`envs/*/providers.tf`). Bootstrap stack must match exactly to avoid mixed-provider drift on shared state bucket. |
 | AWS CLI v2 | Any recent | Live-state inspection for capture-then-translate (D-05) | Required for `aws s3api get-bucket-*` and `aws dynamodb describe-table` verification. Confirmed installed locally (`/opt/homebrew/bin/aws`, v2.34.48). |
 
@@ -93,7 +97,7 @@ None. Bootstrap declares resources inline; no `modules/*` reuse per CONTEXT D-03
 
 | Instead of | Could Use | Tradeoff |
 |------------|-----------|----------|
-| `dynamodb_table = "..."` | `use_lockfile = true` (S3 native locking, GA in Terraform 1.11) | HashiCorp's new recommended default; no DynamoDB cost; no lock-table to manage. Rejected by user in CONTEXT D-06 — phase ships with DynamoDB. The planner does not need to revisit this. [VERIFIED: developer.hashicorp.com S3 backend docs] |
+| `use_lockfile = true` (S3-native, chosen) | `dynamodb_table = "dmair-terraform-locks"` (separate DynamoDB table) | DynamoDB locking is the legacy pattern, deprecated by HashiCorp in 1.11+. Adds an additional AWS resource and IAM permission set with no observable benefit on this single-account, single-operator workload. The phase originally chose DynamoDB (CONTEXT D-06 morning), then switched to use_lockfile the same afternoon (CONTEXT D-06 revised). [VERIFIED: developer.hashicorp.com S3 backend docs] |
 | `terraform import <addr> <id>` (CLI command) | `import { to = ...; id = ... }` block (Terraform 1.5+) | Declarative block is plan-visible (operator sees the import in `terraform plan` output before apply), code-reviewable, and idempotent. CLI command is one-shot and silent. **Recommend the import block.** See section 5 for sequencing. [CITED: developer.hashicorp.com/terraform/language/block/import] |
 | Hardcoded values in `main.tf` | Parameterized `variables.tf` + `terraform.tfvars` | CONTEXT.md left this to planner discretion. **Recommend hardcoding** — bootstrap is one-shot, one-region, one-bucket. Parameterization adds a `tfvars` file the operator must keep in sync with the very values they're hardcoding into other stacks' `backend.tf`. Repo convention is `terraform.tfvars` per env, but bootstrap is uniquely small. |
 
@@ -102,7 +106,7 @@ None. Bootstrap declares resources inline; no `modules/*` reuse per CONTEXT D-03
 Operator workstation prerequisites (NOT currently met on the working machine — verified):
 - Terraform CLI ≥ 1.5 — **NOT INSTALLED** locally (`which terraform` → not found). Install via Homebrew: `brew install terraform` or `brew install hashicorp/tap/terraform`.
 - AWS CLI v2 — **installed** (`/opt/homebrew/bin/aws`, v2.34.48).
-- AWS named profile `dmair` in `~/.aws/credentials` with permissions for `s3:Get*`, `s3:PutBucketTagging`, `dynamodb:CreateTable`, `dynamodb:DescribeTable`, `dynamodb:UpdateTable`, `dynamodb:TagResource`. **The local machine has profile `fly-dmair` (user `dmair-view`), which is read-list only — `s3:GetBucketVersioning`, `s3:GetEncryptionConfiguration`, `s3:GetBucketPublicAccessBlock` all return `AccessDenied`.** Operator must arrange a more-privileged profile/role before running this phase.
+- AWS named profile `dmair` in `~/.aws/credentials` with permissions for `s3:Get*`, `s3:PutBucketTagging`, `s3:PutObject` + `s3:DeleteObject` on the state-bucket prefix (Terraform writes/deletes the `.tflock` object). **The local machine has profile `fly-dmair` (user `dmair-view`), which is read-list only — `s3:GetBucketVersioning`, `s3:GetEncryptionConfiguration`, `s3:GetBucketPublicAccessBlock` all return `AccessDenied`.** Operator must arrange a more-privileged profile/role before running this phase.
 
 **Version verification:**
 
@@ -131,43 +135,47 @@ Operator workstation prerequisites (NOT currently met on the working machine —
        │ bootstrap/  (NEW)              │   │ envs/strapi/                │
        │   backend "s3" {               │   │   backend "s3" {            │
        │     key = "bootstrap/tfstate"  │   │     key = "strapi/tfstate"  │
-       │     # NO dynamodb_table        │   │     dynamodb_table =        │
-       │   }                            │   │       "dmair-terraform-     │
-       │   resources:                   │   │       locks"  # NEW         │
-       │     aws_s3_bucket.this         │   │   }                         │
+       │     use_lockfile = true        │   │     use_lockfile = true     │
+       │   }                            │   │   }                         │
+       │   resources:                   │   │   providers.tf:             │
+       │     aws_s3_bucket.this         │   │     required_version =      │
+       │       (IMPORT)                 │   │       "~> 1.15"             │
+       │     aws_s3_bucket_versioning   │   │                             │
        │       (IMPORT)                 │   │ envs/frontend/prod/         │
-       │     aws_s3_bucket_versioning   │   │   (same pattern)            │
-       │       (IMPORT)                 │   │ envs/frontend/staging/      │
        │     aws_s3_bucket_sse_config   │   │   (same pattern)            │
-       │       (IMPORT)                 │   │                             │
-       │     aws_s3_bucket_PAB          │   └──────────────┬──────────────┘
-       │       (IMPORT)                 │                  │
-       │     aws_dynamodb_table.this    │                  │
-       │       (CREATE — greenfield)    │                  │
+       │       (IMPORT)                 │   │ envs/frontend/staging/      │
+       │     aws_s3_bucket_PAB          │   │   (same pattern)            │
+       │       (IMPORT)                 │   └──────────────┬──────────────┘
        └──────────────┬─────────────────┘                  │
                       │                                    │
                       ▼                                    ▼
        ┌──────────────────────────────────────────────────────────────────┐
        │              AWS account 071297531943, us-west-2                 │
        │                                                                  │
-       │   ┌────────────────────────────────┐  ┌────────────────────────┐ │
-       │   │ S3 bucket                      │  │ DynamoDB table         │ │
-       │   │   dmair-terraform-prod         │  │   dmair-terraform-     │ │
-       │   │   (existing — under IaC after  │  │     locks (greenfield) │ │
-       │   │    bootstrap apply)            │  │   hash_key = LockID(S) │ │
-       │   │                                │  │   billing = PPR        │ │
-       │   │ keys:                          │  │   deletion_protection  │ │
-       │   │   bootstrap/terraform.tfstate  │  │     = true             │ │
-       │   │   strapi/terraform.tfstate     │  │                        │ │
-       │   │   frontend/prod/tf.tfstate     │  │   Items written by all │ │
-       │   │   frontend/staging/tf.tfstate  │  │   four stacks during   │ │
-       │   │                                │  │   plan/apply lock      │ │
-       │   └────────────────────────────────┘  └────────────────────────┘ │
+       │   ┌────────────────────────────────────────────────────────────┐ │
+       │   │ S3 bucket                                                  │ │
+       │   │   dmair-terraform-prod                                     │ │
+       │   │   (existing — under IaC after bootstrap apply)             │ │
+       │   │                                                            │ │
+       │   │ keys:                                                      │ │
+       │   │   bootstrap/terraform.tfstate                              │ │
+       │   │   strapi/terraform.tfstate                                 │ │
+       │   │   frontend/prod/tf.tfstate                                 │ │
+       │   │   frontend/staging/tf.tfstate                              │ │
+       │   │                                                            │ │
+       │   │ Ephemeral lock sentinels (S3 .tflock sentinel objects,     │ │
+       │   │ one per state key, written/deleted by Terraform during    │ │
+       │   │ plan/apply):                                               │ │
+       │   │   bootstrap/terraform.tfstate.tflock                       │ │
+       │   │   strapi/terraform.tfstate.tflock                          │ │
+       │   │   frontend/prod/tf.tfstate.tflock                          │ │
+       │   │   frontend/staging/tf.tfstate.tflock                       │ │
+       │   └────────────────────────────────────────────────────────────┘ │
        └──────────────────────────────────────────────────────────────────┘
 
 Data flow:
-  1. Bootstrap apply: terraform CLI → S3 PutObject (state) + DynamoDB CreateTable + 4× S3 PutObjectTagging (no-op for import)
-  2. Live-stack plan: terraform CLI → DynamoDB PutItem (acquire lock) → S3 GetObject (read state) → diff → DynamoDB DeleteItem (release)
+  1. Bootstrap apply: terraform CLI → S3 PutObject (state) + 4× S3 PutObjectTagging (no-op for import). No new AWS resources beyond the four S3 sub-resource adoptions.
+  2. Live-stack plan: terraform CLI → S3 PutObject (write .tflock sentinel) → S3 GetObject (read state) → diff → S3 DeleteObject (remove .tflock).
   3. Self-referential boundary: bootstrap/ writes its own state to the same bucket it manages. No race because S3 PutObject on a fresh key precedes any resource reconciliation in the apply.
 ```
 
@@ -208,7 +216,9 @@ import {
 }
 ```
 
-### Pattern 2: `aws_dynamodb_table` for Terraform state locking (greenfield)
+### Pattern 2: [OBSOLETE — see Alternatives Considered] `aws_dynamodb_table` for Terraform state locking (greenfield)
+
+**[OBSOLETE 2026-05-20 PM]** This pattern was the chosen approach as of the morning of 2026-05-20 and was replaced the same afternoon by S3-native locking (`use_lockfile = true`). Preserved for audit. Plans 01-02 through 01-06 do NOT implement this pattern.
 
 ```hcl
 # Source: https://github.com/hashicorp/terraform-provider-aws/blob/v5.91.0/website/docs/r/dynamodb_table.html.markdown
@@ -239,7 +249,7 @@ resource "aws_dynamodb_table" "this" {
 - The `attribute` block must NOT declare any other attributes beyond `LockID` — provider docs warn: "Only define attributes on the table object that are going to be used as Table hash key or range key" (declaring extra attributes can cause infinite plan loops). [CITED: provider docs]
 - `deletion_protection_enabled` is the DynamoDB-native equivalent of the `lifecycle { prevent_destroy = true }` pattern used on CloudFront / EC2 / EIP elsewhere in the repo. CONTEXT D-08 chose this style. **Verified supported in provider 5.91.0** (introduced in v4.59.0, March 2023). [VERIFIED: hashicorp/terraform-provider-aws#29876]
 
-### Pattern 3: Backend block with DynamoDB lock (live-stack rewire)
+### Pattern 3: Backend block with S3-native state locking (live-stack rewire)
 
 The single-line edit applied to each `envs/*/backend.tf`:
 
@@ -251,12 +261,30 @@ terraform {
     region                   = "us-west-2"
     profile                  = "dmair"
     shared_credentials_files = ["~/.aws/credentials"]
-    dynamodb_table           = "dmair-terraform-locks"   # NEW LINE
+    use_lockfile             = true   # NEW LINE
   }
 }
 ```
 
-After the edit, run `terraform init -reconfigure` (NOT `-migrate-state` — adding a lock table to an existing S3 backend is a metadata-only reconfigure; no state moves). Per CONTEXT D-12, if `-reconfigure` prompts for `-migrate-state` instead, stop and investigate. [VERIFIED: HashiCorp guidance + community confirmation across multiple sources]
+After the edit, run `terraform init -reconfigure` (NOT `-migrate-state` — toggling the lock mechanism on an existing S3 backend is a metadata-only reconfigure; no state moves). Per CONTEXT D-12, if `-reconfigure` prompts for `-migrate-state` instead, stop and investigate. [VERIFIED: HashiCorp guidance + community confirmation across multiple sources]
+
+### Pattern 4: `required_version` pin in each `providers.tf`
+
+The single-line edit added to each `providers.tf` (bootstrap + the three env stacks):
+
+```hcl
+terraform {
+  required_version = "~> 1.15"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "5.91.0"
+    }
+  }
+}
+```
+
+Rationale: `use_lockfile = true` requires Terraform ≥ 1.10. The workstation runs 1.15.3; pinning `~> 1.15` accepts any 1.15.x patch release without accidentally landing on 1.16. [VERIFIED: developer.hashicorp.com/terraform/language/settings#specifying-a-required-terraform-version]
 
 ### Anti-Patterns to Avoid
 
@@ -270,7 +298,7 @@ After the edit, run `terraform init -reconfigure` (NOT `-migrate-state` — addi
 
 | Problem | Don't Build | Use Instead | Why |
 |---------|-------------|-------------|-----|
-| Concurrent-apply prevention | A custom lock file in S3, a flock-on-shared-NFS, a database row in RDS | `aws_dynamodb_table` + `dynamodb_table = "..."` in backend block | Terraform's built-in S3+DynamoDB locking is the canonical pattern; native S3 lockfile (`use_lockfile = true`) supersedes it in 1.11+ but is not the locked decision for this phase. Hand-rolled locking is the actual root cause of state corruption stories. |
+| Concurrent-apply prevention | A custom lock file in S3, a flock-on-shared-NFS, a database row in RDS | `use_lockfile = true` in backend block (Terraform 1.10+ S3-native locking) | Terraform's built-in S3-native locking via `use_lockfile = true` is the current canonical pattern (DynamoDB-based locking is the deprecated predecessor and is preserved in this phase's audit trail under Alternatives Considered). Hand-rolled locking is the actual root cause of state corruption stories. |
 | State-bucket adoption | A shell script that runs `terraform state push` against a hand-crafted state file | `import {}` block in the `bootstrap/` HCL | Terraform's declarative import handles AWS API discovery, attribute population, and refresh in one transaction. Hand-crafted state files miss computed attributes and are an indefinite source of "state vs reality" drift. |
 | Pre-flight live-state capture | Hand-typed JSON / hand-typed HCL from memory | `aws s3api get-bucket-*` commands → record JSON → translate to HCL field-by-field | The four S3 sub-resource imports MUST mirror live AWS state verbatim or BOOTSTRAP-01's `No changes` gate fails. There is no provider-side or Terraform-side fuzzy-match — the plan diff is literal. |
 
@@ -326,9 +354,9 @@ This phase is greenfield-plus-import, not a rename/refactor. The S3 bucket exist
 | Req ID | Behavior | Verification Type | Verification Command | File Exists? |
 |--------|----------|-------------------|----------------------|--------------|
 | BOOTSTRAP-01 | `bootstrap/` plans clean after import + table create | Manual (operator) | `cd bootstrap && terraform plan` → expect `No changes. Your infrastructure matches the configuration.` | Bootstrap stack to be created in Phase 1 |
-| BOOTSTRAP-02 | All 3 live stacks plan clean after `dynamodb_table` rewire | Manual (operator) | For each of `envs/strapi`, `envs/frontend/prod`, `envs/frontend/staging`: `terraform init -reconfigure && terraform plan` → expect `No changes.` | ✅ all three `backend.tf` files exist |
+| BOOTSTRAP-02 | All 3 live stacks plan clean after `use_lockfile` rewire | Manual (operator) | For each of `envs/strapi`, `envs/frontend/prod`, `envs/frontend/staging`: `terraform init -reconfigure && terraform plan` → expect `No changes.` | ✅ all three `backend.tf` files exist |
 | BOOTSTRAP-03 | Concurrent apply in same stack blocks on lock | Manual (operator, two terminals) | Terminal A: `cd envs/strapi && terraform apply` (D-15). Terminal B (immediately after A starts): same command. Expected terminal B output: `Acquiring state lock. This may take a few moments...` then blocks until A completes. | ✅ `envs/strapi/` exists |
-| BOOTSTRAP success criterion 4 | DynamoDB table is `ACTIVE` with `LockID(S)` hash key | Automated (one-liner) | `aws dynamodb describe-table --table-name dmair-terraform-locks --region us-west-2 --profile dmair` → JSON must contain `"TableStatus": "ACTIVE"` and `"KeySchema": [{"AttributeName": "LockID", "KeyType": "HASH"}]` | Table to be created in Phase 1 |
+| BOOTSTRAP success criterion 4 | `.tflock` sentinel object observed during held apply | Manual (operator, third terminal) | During a held terraform apply against `envs/strapi`: `aws --profile dmair s3 ls s3://dmair-terraform-prod/strapi/` → output must include `strapi/terraform.tfstate.tflock`. After apply release, re-run same s3 ls → output must NOT include the .tflock object. | ✅ `envs/strapi/` exists |
 
 ### Sampling Rate
 
@@ -344,7 +372,7 @@ This phase is greenfield-plus-import, not a rename/refactor. The S3 bucket exist
 
 ## Common Pitfalls
 
-### Pitfall 1: `read_capacity` / `write_capacity` declared under `PAY_PER_REQUEST`
+### Pitfall 1: `read_capacity` / `write_capacity` declared under `PAY_PER_REQUEST` [no longer applies under chosen approach — preserved for audit trail]
 
 **What goes wrong:** `terraform apply` returns AWS API error: `Neither ReadCapacityUnits nor WriteCapacityUnits can be specified when BillingMode is PAY_PER_REQUEST` (or, in some provider versions, the provider catches it earlier as a plan-time validation error).
 **Why it happens:** Many DynamoDB examples online show `read_capacity = 5; write_capacity = 5` because they predate on-demand. Copy-pasted into a PPR table, AWS rejects.
@@ -381,7 +409,7 @@ This phase is greenfield-plus-import, not a rename/refactor. The S3 bucket exist
 **How to avoid:** Before running `init -reconfigure` on each live stack, verify the local `.terraform/terraform.tfstate` exists and references the current bucket/key. If not (e.g., on a fresh checkout), running `terraform init` first (without `-reconfigure`) populates the cache cleanly, then adding `dynamodb_table` and `init -reconfigure` is a clean metadata-only change.
 **Recovery:** Answer NO to the migrate-state prompt, investigate `.terraform/` cache state, and retry. Never blindly accept migrate-state during this phase.
 
-### Pitfall 6: `dynamodb_table` deprecation warning on Terraform 1.11+
+### Pitfall 6: `dynamodb_table` deprecation warning on Terraform 1.11+ [no longer applies under chosen approach — preserved for audit trail]
 
 **What goes wrong:** `terraform init` / `plan` / `apply` prints a deprecation warning: `The dynamodb_table argument is deprecated and will be removed in a future minor version. Use use_lockfile = true for S3 native locking instead.` Operator misreads it as a plan diff or fails the zero-change-plan gate.
 **Why it happens:** HashiCorp deprecated DynamoDB-based locking in Terraform 1.11 in favor of `use_lockfile = true`. CONTEXT D-06 locked in DynamoDB, so the phase ships with the deprecated argument; the warning is informational, not an error.
@@ -408,6 +436,13 @@ This phase is greenfield-plus-import, not a rename/refactor. The S3 bucket exist
 **What goes wrong:** `terraform init` in `bootstrap/` produces a `.terraform.lock.hcl` keyed to the local OS/arch. If another operator runs from a different OS/arch later, lockfile drift can occur.
 **Why it happens:** This is universal Terraform behavior, not specific to this phase. Existing `envs/*/.terraform.lock.hcl` files in the repo already exhibit this — operators have tolerated it.
 **How to avoid:** Commit the lockfile generated on the first apply machine. Future operators who hit a hash mismatch can run `terraform providers lock -platform=darwin_arm64 -platform=linux_amd64` to add additional platforms.
+
+### Pitfall 10: `.tflock` sentinel left behind after a crashed apply (use_lockfile)
+
+**What goes wrong:** If a `terraform apply` process crashes hard (e.g., the operator's machine loses power or the SSH session drops), the `.tflock` sentinel object can be left in S3 and block subsequent applies. Subsequent `terraform plan`/`apply` reports `Error acquiring the state lock`.
+**Why it happens:** Terraform writes the `.tflock` object at lock acquisition and deletes it at release. A crash between acquisition and release leaves the object orphaned.
+**How to avoid:** Always Ctrl-C cleanly (Terraform catches SIGINT and releases the lock) rather than killing the process or rebooting mid-apply.
+**Recovery:** `aws s3 rm s3://dmair-terraform-prod/<state-key>.tflock` (only after confirming no other terraform process holds it — verify via `ps`).
 
 ## Code Examples
 
@@ -555,10 +590,10 @@ resource "aws_dynamodb_table" "this" {
 }
 ```
 
-### Example 3: `bootstrap/backend.tf` (self-referential — note NO `dynamodb_table`)
+### Example 3: `bootstrap/backend.tf` (self-referential — uses S3-native locking)
 
 ```hcl
-# Source: matches envs/strapi/backend.tf shape exactly, with key swapped
+# Source: matches envs/strapi/backend.tf shape exactly, with key swapped + use_lockfile added
 terraform {
   backend "s3" {
     bucket                   = "dmair-terraform-prod"
@@ -566,16 +601,17 @@ terraform {
     region                   = "us-west-2"
     profile                  = "dmair"
     shared_credentials_files = ["~/.aws/credentials"]
-    # Intentionally NO dynamodb_table — per CONTEXT D-01, bootstrap is unlocked
+    use_lockfile             = true   # per CONTEXT D-01 (revised 2026-05-20 PM) — bootstrap uses S3-native locking like every other stack
   }
 }
 ```
 
-### Example 4: `bootstrap/providers.tf` (copies `envs/strapi/providers.tf` shape exactly)
+### Example 4: `bootstrap/providers.tf` (copies `envs/strapi/providers.tf` shape, adds required_version pin)
 
 ```hcl
 # Source: envs/strapi/providers.tf (verbatim shape — only var defaults / hardcoded values differ)
 terraform {
+  required_version = "~> 1.15"
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -605,17 +641,16 @@ terraform init
 
 terraform plan
 # Expect:
-#   - aws_dynamodb_table.this CREATE (new)
 #   - aws_s3_bucket.this IMPORT (existing)
 #   - aws_s3_bucket_versioning.this IMPORT
 #   - aws_s3_bucket_server_side_encryption_configuration.this IMPORT
 #   - aws_s3_bucket_public_access_block.this IMPORT
-#   - Total: 1 to add, 4 to import, 0 to change, 0 to destroy.
+#   - Total: 0 to add, 4 to import, 0 to change, 0 to destroy.
 # If "to change" is NOT 0 for any imported resource, STOP — Pitfall 2.
 
 terraform apply
-# Expect: 5 success lines, no errors. The DynamoDB table is created;
-# the 4 S3 sub-resources are adopted into state with their AWS-side values.
+# Expect: 4 success lines (S3 IMPORTs only), no errors. The 4 S3 sub-resources are
+# adopted into state with their AWS-side values. No CREATEs.
 
 terraform plan
 # CRITICAL: must report "No changes. Your infrastructure matches the configuration."
@@ -629,7 +664,8 @@ terraform plan
 ### Example 6: Per-stack rewire sequence (run 3× per CONTEXT D-11)
 
 ```bash
-# 1. Edit envs/strapi/backend.tf — add: dynamodb_table = "dmair-terraform-locks"
+# 1. Edit envs/strapi/backend.tf — add: use_lockfile = true
+# 2. Edit envs/strapi/providers.tf — add: required_version = "~> 1.15"
 cd envs/strapi
 terraform init -reconfigure
 # Expect: "Successfully configured the backend "s3"!"
@@ -637,9 +673,8 @@ terraform init -reconfigure
 
 terraform plan
 # CRITICAL: must report "No changes."
-# A deprecation warning on dynamodb_table (Terraform 1.11+) is EXPECTED — Pitfall 6.
 
-# Commit envs/strapi/backend.tf edit.
+# Commit envs/strapi/backend.tf edit and envs/strapi/providers.tf edit as TWO separate commits.
 
 # Repeat for envs/frontend/prod, then envs/frontend/staging.
 ```
@@ -673,7 +708,7 @@ terraform force-unlock <LOCK_ID_FROM_ERROR_MESSAGE>
 |--------------|------------------|--------------|--------|
 | `aws_s3_bucket` with inline `versioning {}`, `server_side_encryption_configuration {}`, etc. | Separate `aws_s3_bucket_versioning`, `aws_s3_bucket_server_side_encryption_configuration`, `aws_s3_bucket_public_access_block`, etc. resources | provider v4 (April 2022); enforced in v5 | The split happened years ago; CONTEXT D-03's resource list reflects current best practice. Old inline blocks are removed in v5. |
 | `terraform import <addr> <id>` (CLI command) | `import { to = ...; id = ... }` block | Terraform 1.5 (May 2023) | Declarative, plan-visible, code-reviewable. **Preferred for this phase.** |
-| `dynamodb_table = "..."` in backend `"s3"` block | `use_lockfile = true` (S3 native locking) | Terraform 1.10 experimental (Nov 2024), GA in 1.11 | DynamoDB locking now deprecated but still functional. **Phase ships with DynamoDB per CONTEXT D-06 — do not migrate.** Plan for `use_lockfile` migration as v2 work. |
+| `dynamodb_table = "..."` in backend `"s3"` block | `use_lockfile = true` (S3 native locking, GA Terraform 1.11) | Terraform 1.10 experimental (Nov 2024), GA in 1.11 | The phase initially chose DynamoDB (CONTEXT D-06 morning of 2026-05-20) then switched to use_lockfile the same afternoon — see CONTEXT.md Previously Assumed. |
 
 **Deprecated / outdated (do NOT use):**
 - Inline `versioning {}` block on `aws_s3_bucket` — removed in provider v5.
@@ -721,7 +756,7 @@ terraform force-unlock <LOCK_ID_FROM_ERROR_MESSAGE>
   - `website/docs/r/s3_bucket_server_side_encryption_configuration.html.markdown` — SSE resource + import + sse_algorithm valid values
   - `website/docs/r/s3_bucket_public_access_block.html.markdown` — PAB resource + import + defaults (all false)
   - `website/docs/r/dynamodb_table.html.markdown` — table resource args, billing_mode values, deletion_protection_enabled, point_in_time_recovery block, attribute-block-loop warning
-- `developer.hashicorp.com/terraform/language/backend/s3` — S3 backend `dynamodb_table` argument; LockID(S) partition key requirement; DynamoDB locking deprecated in favor of `use_lockfile = true`
+- `developer.hashicorp.com/terraform/language/backend/s3` — S3 backend `use_lockfile` argument (chosen approach); `dynamodb_table` (legacy, see Alternatives Considered). S3 backend `use_lockfile` documentation: developer.hashicorp.com/terraform/language/backend/s3#use_lockfile — verified.
 - `developer.hashicorp.com/terraform/language/block/import` — declarative `import {}` block syntax + best practice to remove after successful apply
 - Repo files at exact paths:
   - `envs/strapi/backend.tf`, `envs/frontend/prod/backend.tf`, `envs/frontend/staging/backend.tf` — current backend shape (no `dynamodb_table`)
