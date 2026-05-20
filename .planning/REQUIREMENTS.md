@@ -23,9 +23,24 @@
 
 ### Staging — dmair-backend Slot
 
-- [ ] **STAGING-01**: `live/dmair/staging/backend/` Terraform stack provisions the AWS resources required for the dmair-backend staging deployment (EC2 + Elastic IP + Security Group + ECR + Secrets Manager scaffolding, sized for staging — exact composition to be settled at /gsd-discuss-phase). Targets `api-staging.flydmair.com`.
+- [ ] **STAGING-01**: `live/dmair/staging/backend/` Terraform stack provisions the full staging AWS resource set per `dmair-backend/deployment/staging/STAGING-DEPLOYMENT.md` §10. Targets `api-staging.flydmair.com`. Required components:
+  - **Networking:** VPC + 2 public subnets across 2 AZs + IGW + route tables (per STAGING-DEPLOYMENT.md §3.1)
+  - **Compute:** EC2 `t4g.medium` (Ubuntu 24.04 LTS ARM64) + Elastic IP + EBS encryption at rest
+  - **IAM:** EC2 instance role with: SSM Session Manager, ECR pull, Secrets Manager read, CloudWatch logs write
+  - **Security groups:** EC2 (`80`/`443` from Internet, no SSH); RDS (`5432` from EC2 SG only)
+  - **Database:** RDS PostgreSQL 16 + PostGIS extension, `db.t4g.micro`, Single-AZ, automated backups
+  - **Container registry:** ECR repository for the dmair-backend image (ARM64)
+  - **Secrets:** AWS Secrets Manager — 1 consolidated JSON secret for app config
+  - **Logs:** CloudWatch log group `/dmair/staging`, 5-day retention
+  - **Cost guard:** AWS Budgets monthly threshold + email notification for this staging stack
+  - **Out of scope for this requirement:** EC2 user-data (docker-compose launcher), Caddy config, the dmair-backend image itself — those are dmair-backend ART-* requirements, not terraform.
 - [ ] **STAGING-02**: A DNS A-record for `api-staging.flydmair.com` points at the staging backend's Elastic IP. An ACM/Let's Encrypt cert for that hostname is acquirable from the EC2 host.
 - [ ] **STAGING-03**: A GitHub OIDC IAM role + tag/prefix-scoped IAM policy lets `dmair-backend` CI deploy into `live/dmair/staging/*` without being able to mutate existing `cms-*` / `frontend-*` resources in the shared `dmair` AWS account. Scoping is verified by an explicit deny-by-exclusion test (CI role attempts to read or modify a frontend resource and is rejected).
+
+### CI/CD — Terraform Pipeline
+
+- [ ] **CICD-01**: `.github/workflows/terraform.yml` runs `terraform fmt -check`, `terraform validate`, and `terraform plan` on every PR to `main` for each `live/*` stack and `bootstrap/`. On merge to `main`, a required-reviewer-gated `terraform apply` runs per stack via GitHub Environments (one environment per stack: `bootstrap`, `prod-strapi`, `prod-frontend`, `staging-frontend`, `staging-backend`). The pipeline assumes the per-repo GitHub OIDC role provisioned in STAGING-03 / a new OIDC-01.
+- [ ] **CICD-02**: GitHub OIDC trust provider + per-repo per-stack IAM roles exist for `sayone-tech/dmair-terraform` (terraform pipeline) and the role names + ARNs are documented in a new `OIDC.md` runbook for operator handoff to `dmair-backend`.
 
 ## v2 Requirements
 
@@ -58,26 +73,26 @@ Deferred to future milestones — tracked but not in this roadmap.
 
 ## Traceability
 
-Empty — will be populated by `/gsd-roadmapper` during roadmap creation.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BOOTSTRAP-01 | TBD | Pending |
-| BOOTSTRAP-02 | TBD | Pending |
-| BOOTSTRAP-03 | TBD | Pending |
-| REFACTOR-01 | TBD | Pending |
-| REFACTOR-02 | TBD | Pending |
-| REFACTOR-03 | TBD | Pending |
-| DOCS-01 | TBD | Pending |
-| STAGING-01 | TBD | Pending |
-| STAGING-02 | TBD | Pending |
-| STAGING-03 | TBD | Pending |
+| BOOTSTRAP-01 | Phase 1 | Pending |
+| BOOTSTRAP-02 | Phase 1 | Pending |
+| BOOTSTRAP-03 | Phase 1 | Pending |
+| REFACTOR-01 | Phase 2 | Pending |
+| REFACTOR-02 | Phase 2 | Pending |
+| REFACTOR-03 | Phase 2 | Pending |
+| DOCS-01 | Phase 2 | Pending |
+| STAGING-01 | Phase 3 | Pending |
+| STAGING-02 | Phase 3 | Pending |
+| STAGING-03 | Phase 3 | Pending |
+| CICD-01 | Phase 4 | Pending |
+| CICD-02 | Phase 4 | Pending |
 
 **Coverage:**
-- v1 requirements: 10 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 10 ⚠️ (expected until roadmap is created)
+- v1 requirements: 12 total
+- Mapped to phases: 12
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-05-20*
-*Last updated: 2026-05-20 after initial definition*
+*Last updated: 2026-05-20 after roadmap creation (traceability populated)*

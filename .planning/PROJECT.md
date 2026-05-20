@@ -61,6 +61,11 @@ delivered on top of that invariant, not at the cost of it.
   `dmair-backend` CI deploy into `live/dmair/staging/*` without being able to touch
   existing `cms-*`/`frontend-*` resources in the shared account
 
+**CI/CD pipeline (this milestone):**
+
+- [ ] **CICD-01**: `.github/workflows/terraform.yml` — PR-gated Lint + Plan; merge-gated Apply per-stack via GitHub Environments
+- [ ] **CICD-02**: OIDC trust provider + per-repo per-stack roles, documented in `OIDC.md` for cross-repo consumption
+
 ### Out of Scope
 
 - **`us-east-1` region or a separate AWS account for dmair-backend** — chose
@@ -98,6 +103,30 @@ delivered on top of that invariant, not at the cost of it.
   reaching CMS/frontend resources
 - **Team:** primary engineer + 1–2 collaborators. Branch hygiene matters; PRs welcome
   but not gated
+
+## Cross-Repo Phase Mapping
+
+This milestone implements work that the sibling repo `bere-creator/dmair-backend`
+specifies in its v1.3 ROADMAP (Phases 8–11). The two repos use independent phase
+numbering. Mapping:
+
+| `dmair-backend` phase | `dmair-terraform` phase(s) | Notes |
+|-----------------------|---------------------------|-------|
+| Phase 8 (Backend Deployment Readiness) | n/a — app-side only | Shipped 2026-05-19. No terraform work. |
+| Phase 9 (Terraform Refactor + State Backend) | Phase 1 (Bootstrap) + Phase 2 (Refactor) | Split across two phases here to isolate bootstrap-state risk from rename risk. |
+| Phase 10 (Staging Infrastructure Stack) | Phase 3 (Staging Slot) | INFRA-* + CICD-02 policy (OIDC IAM) live here; ART-* (compose, Caddyfile, image build) live in dmair-backend. |
+| Phase 11 (CI/CD Pipelines + Go-Live) | Phase 4 (CI/CD Pipeline + OIDC) — partial | CICD-01 (terraform.yml) lives here; ART-03 (deploy-staging.yml), OPS-01/02 (verification), OPS-03 (SRE runbook) live in dmair-backend. |
+
+Cross-repo contracts (renaming any of these is expensive):
+
+- DNS name: `api-staging.flydmair.com` (terraform repo provisions/registers; dmair-backend Caddy claims certs against it)
+- OIDC role for `dmair-backend` CI: name + ARN documented in `OIDC.md` (Phase 4), consumed by `dmair-backend/.github/workflows/deploy-staging.yml`
+- ECR repository name + URI: output by Phase 3 staging stack, consumed by the dmair-backend image push step
+- Consolidated Secrets Manager secret name: output by Phase 3, consumed by the dmair-backend EC2 user-data launcher
+
+Coordination expectation: when any of the above contracts changes here, post the
+change in `dmair-backend` and update `deployment/staging/STAGING-DEPLOYMENT.md` in
+the same PR cycle.
 
 ## Constraints
 
