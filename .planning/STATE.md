@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-last_updated: "2026-05-20T09:23:24.312Z"
+last_updated: "2026-05-20T11:39:14.476Z"
 progress:
   total_phases: 4
   completed_phases: 0
@@ -16,11 +16,13 @@ progress:
 
 **Last Updated:** 2026-05-20
 
+Last activity: 2026-05-20 - Completed quick task 260520-ntp: Drop DynamoDB locking from Phase 1, use S3-native use_lockfile and bump Terraform pin to ~> 1.15
+
 ## Project Reference
 
 **Core Value:** Live infra is sacred — `terraform plan` on every existing live stack must report "No changes" after every refactor commit. The dmair-backend staging slot is delivered on top of that invariant.
 
-**Current Focus:** Phase 1 — Bootstrap State Backend (self-describing state backend + DynamoDB locking).
+**Current Focus:** Phase 1 — Bootstrap State Backend (self-describing state backend + S3-native state locking via `use_lockfile = true`).
 
 ## Current Position
 
@@ -48,7 +50,8 @@ progress:
 - **Backend staging DNS:** `api-staging.flydmair.com` — avoids collision with existing `staging.flydmair.com` (frontend CloudFront).
 - **Layout:** `live/dmair/<env>/<component>` — project-keyed under `dmair`, matches existing AWS profile name.
 - **Account topology:** single shared `dmair` AWS account; isolation deferred. OIDC scoping in Phase 3 must keep dmair-backend CI from reaching CMS/frontend resources.
-- **Bootstrap stack:** `terraform import` the existing `dmair-terraform-prod` bucket AND add the missing `dmair-terraform-locks` DynamoDB table — state backend becomes self-describing IaC.
+- **Bootstrap stack:** `terraform import` the existing `dmair-terraform-prod` bucket — state backend becomes self-describing IaC. No DynamoDB lock table; locking uses Terraform 1.10+'s S3-native `use_lockfile = true` (decided 2026-05-20, quick-task 260520-ntp).
+- **Terraform pin:** `required_version = "~> 1.15"` across `bootstrap/` and all `envs/*/providers.tf` — `use_lockfile` requires ≥ 1.10; workstation runs 1.15.3.
 - **State keys:** stay at current paths during folder rename. Bucket layout drift is accepted; relocation tracked as v2 STATE-01.
 
 ### Open Todos
@@ -61,10 +64,16 @@ progress:
 
 None. Phase 1 has no upstream dependency.
 
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260520-ntp | Drop DynamoDB locking from Phase 1, use S3-native use_lockfile and bump Terraform pin to ~> 1.15 | 2026-05-20 | 015809f | [260520-ntp-drop-dynamodb-locking-from-phase-1-use-s](./quick/260520-ntp-drop-dynamodb-locking-from-phase-1-use-s/) |
+
 ### Risks Logged
 
 - **EC2 `prevent_destroy = true`** on Strapi instance — any refactor must preserve the existing resource address (use `moved {}` blocks). Phase 2 risk.
-- **No state locking today** — README mentions `terraform-state-lock` but no `backend.tf` declares a DynamoDB table. Concurrent applies from two operators would corrupt state. Phase 1 closes this.
+- **No state locking today** — README mentions `terraform-state-lock` but no `backend.tf` declares any locking mechanism. Concurrent applies from two operators would corrupt state. Phase 1 closes this via S3-native `use_lockfile = true`.
 - **Single shared AWS account** — OIDC role for dmair-backend CI (Phase 3) must be tag/prefix-scoped to deny existing `cms-*` / `frontend-*` resources. Verified by explicit deny-by-exclusion test.
 - **Cross-repo contract:** `api-staging.flydmair.com` DNS name and OIDC role name are consumed by `dmair-backend`. Renaming them later is expensive.
 
@@ -72,7 +81,7 @@ None. Phase 1 has no upstream dependency.
 
 **Resume point:** Run `/gsd-plan-phase 1` to decompose Phase 1 into plans.
 **Last action:** Roadmap created and validated (100% v1 coverage).
-**Next milestone:** Phase 1 complete — bootstrap stack applied, DynamoDB lock table wired into all three existing `backend.tf` files, zero-change plans verified.
+**Next milestone:** Phase 1 complete — bootstrap stack applied, `use_lockfile = true` wired into all three existing `backend.tf` files, zero-change plans verified.
 
 ---
 *State initialized: 2026-05-20*
