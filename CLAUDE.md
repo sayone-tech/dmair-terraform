@@ -18,7 +18,7 @@ delivered on top of that invariant, not at the cost of it.
 
 ### Constraints
 
-- **Tech stack:** Terraform CLI ≥ 1.0, `hashicorp/aws` provider pinned at `5.91.0`,
+- **Tech stack:** Terraform CLI ≥ 1.10, `hashicorp/aws` provider pinned at `5.91.0`,
   HCL only — no Terraform Registry modules, all module sources are local `../../modules/...`
 - **Region:** `us-west-2` for all stacks (existing + new staging). Hard constraint —
   changing regions would require destroying EC2 with `prevent_destroy = true`
@@ -40,7 +40,7 @@ delivered on top of that invariant, not at the cost of it.
 - JavaScript (CloudFront JS runtime 1.0) - CloudFront edge functions at `modules/cloudfront-function/basic_auth.js` and `modules/cloudfront-function/url_rewrite.js`
 - Bash - EC2 user-data bootstrap script at `envs/strapi/startup_exact.sh`
 ## Runtime
-- Terraform CLI >= 1.0 (referenced in setup docs; lockfile is present per-workspace)
+- Terraform CLI >= 1.10 (Phase 1 onward — required for S3-native state locking; per-workspace pin is "~> 1.15")
 - AWS Provider is the sole runtime dependency — no local compute runtime
 - Terraform module system (local `source = "../../modules/..."` paths only — no Terraform Registry modules used)
 - Lockfile: Present at each workspace — `envs/strapi/.terraform.lock.hcl`, `envs/frontend/staging/.terraform.lock.hcl`, `envs/frontend/prod/.terraform.lock.hcl`
@@ -62,13 +62,14 @@ delivered on top of that invariant, not at the cost of it.
 - `envs/frontend/prod/providers.tf` — provider config for frontend prod
 - `policies/*.tpl` — parameterized IAM policy JSON templates consumed by `modules/iam-policy/main.tf`
 ## Platform Requirements
-- Terraform CLI >= 1.0
+- Terraform CLI >= 1.10
+- Each Terraform workspace pins `required_version = "~> 1.15"` in its `providers.tf` as of Phase 1 (workstation runs 1.15.3; >= 1.10 is the absolute floor because S3-native state locking via `use_lockfile = true` requires it).
 - AWS CLI v2 (for credential management and running `terraform output`)
 - AWS named profile `dmair` in `~/.aws/credentials`
 - AWS region: `us-west-2` (all workspaces)
 - Terraform state stored remotely in S3 bucket `dmair-terraform-prod` (region `us-west-2`)
 - State keys: `strapi/terraform.tfstate`, `frontend/staging/terraform.tfstate`, `frontend/prod/terraform.tfstate`
-- No state locking (DynamoDB) configured — S3 backend only
+- State locking via S3-native `use_lockfile = true` (Terraform 1.10+ feature) — a `.tflock` sentinel object is written alongside each `terraform.tfstate` during plan/apply. No DynamoDB table.
 <!-- GSD:stack-end -->
 
 <!-- GSD:conventions-start source:CONVENTIONS.md -->
@@ -210,7 +211,7 @@ delivered on top of that invariant, not at the cost of it.
 ```
 - All three workspaces share one S3 bucket `dmair-terraform-prod` (us-west-2), differentiated by state key:
 - Credentials use named AWS profile `dmair` with `~/.aws/credentials` (shared credentials file)
-- No state locking via DynamoDB is configured in any `backend.tf` (lock table referenced only in README)
+- S3 backend with S3-native state locking (`use_lockfile = true`, Terraform 1.10+). The `.tflock` sentinel object lives alongside the state object in the same bucket prefix.
 ## Key Abstractions
 - Purpose: Reusable S3 bucket with configurable public-access blocking, CORS, optional website hosting, optional versioning, optional AES256 SSE
 - Feature toggles: `enable_website`, `enable_versioning`, `enable_encryption` (all bool variables, defaulting to off except encryption)
@@ -237,7 +238,7 @@ delivered on top of that invariant, not at the cost of it.
 - Responsibilities: Full backend stack — S3, CloudFront, ECR, Security Group, EC2 with startup script, Elastic IP, Secrets Manager, GitHub Actions CI user, Strapi app IAM user, EC2 IAM role
 ## Architectural Constraints
 - **Independent state:** Workspaces share no Terraform state. Cross-environment resource references (e.g., prod using staging outputs) are not possible without manual data source lookups.
-- **No state locking:** DynamoDB lock table is absent from all `backend.tf` configurations. Concurrent `terraform apply` runs in the same workspace can corrupt state.
+- **State locking via S3-native `use_lockfile = true`:** every `backend.tf` enables S3-native locking as of Phase 1. The `.tflock` sentinel object is written by Terraform to the same S3 prefix as `terraform.tfstate` during plan/apply. No DynamoDB lock table — the previously-considered approach was superseded the same afternoon (2026-05-20) it was scoped.
 - **prevent_destroy on critical resources:** `aws_cloudfront_distribution` (`modules/cloudfront/main.tf:126`), `aws_instance` (`modules/ec2/main.tf:46`), and `aws_eip` (`modules/eip/main.tf:11`) all have `lifecycle { prevent_destroy = true }`. Destroying these requires removing the lifecycle block first.
 - **EC2 lifecycle ignore_changes:** `ami`, `user_data`, `key_name`, `availability_zone`, `associate_public_ip_address` are all ignored after creation (`modules/ec2/main.tf:46-51`). AMI and user data changes must be applied via instance replacement with lifecycle block removal.
 - **AWS provider version pinned:** All environments pin `hashicorp/aws` at exactly `5.91.0` (`providers.tf` in each env). Module directories carry no provider requirements.
@@ -247,7 +248,8 @@ delivered on top of that invariant, not at the cost of it.
 ## Anti-Patterns
 ### Hardcoded IP in Security Group Module
 ### README State Bucket Mismatch
-### Missing DynamoDB State Locking
+### Missing State Locking [RESOLVED in Phase 1]
+Phase 1 (Bootstrap State Backend) enables S3-native state locking (`use_lockfile = true`) on every backend, including the new `bootstrap/` stack. The legacy DynamoDB-table approach was scoped on 2026-05-20 morning and replaced by `use_lockfile` the same afternoon.
 ## Error Handling
 - `prevent_destroy = true` on critical resources (CloudFront, EC2, EIP) to block accidental destruction
 - `ignore_changes` on EC2 `ami`, `user_data`, `key_name` to avoid drift-triggered replacements after initial provisioning
