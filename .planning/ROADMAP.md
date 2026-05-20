@@ -24,7 +24,13 @@
   2. `terraform plan` in each of `envs/strapi`, `envs/frontend/prod`, `envs/frontend/staging` reports "No changes" after `dynamodb_table = "dmair-terraform-locks"` is added to `backend.tf` and `terraform init -reconfigure` is run.
   3. Concurrent `terraform apply` from two terminals in the same stack blocks the second one on the DynamoDB lock: operator runs `terraform apply` in terminal A and immediately again in terminal B; terminal B prints `Acquiring state lock. This may take a few moments...` and waits until terminal A releases.
   4. `aws dynamodb describe-table --table-name dmair-terraform-locks --region us-west-2` returns a table with `LockID` (String) as the hash key and `ACTIVE` status.
-**Plans:** TBD
+**Plans:** 6 plans
+  - [ ] 01-01-PLAN.md — Operator preconditions + live-state capture (BOOTSTRAP-01 prerequisite)
+  - [ ] 01-02-PLAN.md — Create bootstrap/ stack, import bucket + create lock table, zero-change verify (BOOTSTRAP-01)
+  - [ ] 01-03-PLAN.md — Rewire envs/strapi/backend.tf (BOOTSTRAP-02, 1/3)
+  - [ ] 01-04-PLAN.md — Rewire envs/frontend/prod/backend.tf (BOOTSTRAP-02, 2/3)
+  - [ ] 01-05-PLAN.md — Rewire envs/frontend/staging/backend.tf (BOOTSTRAP-02, 3/3)
+  - [ ] 01-06-PLAN.md — Two-terminal concurrent-lock verification + describe-table + VERIFICATION.md (BOOTSTRAP-03)
 
 ### Phase 2: Refactor to live/ Layout
 **Goal:** Folder layout is migrated to `live/dmair/<env>/<component>`, all three existing live stacks still plan clean, the staging backend slot directory exists, and the README reflects the new reality.
@@ -68,7 +74,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Bootstrap State Backend | 0/0 | Not started | - |
+| 1. Bootstrap State Backend | 0/6 | Planned | - |
 | 2. Refactor to live/ Layout | 0/0 | Not started | - |
 | 3. dmair-backend Staging Slot | 0/0 | Not started | - |
 | 4. CI/CD Pipeline + OIDC | 0/0 | Not started | - |
