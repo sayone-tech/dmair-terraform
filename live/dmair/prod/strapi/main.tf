@@ -1,6 +1,6 @@
 
 module "app_s3_bucket" {
-  source = "../../modules/s3"
+  source = "../../../../modules/s3"
 
   APP_NAME = "${var.APP_NAME}-cms"
   ENV      = var.ENV
@@ -23,14 +23,14 @@ module "app_s3_bucket" {
 }
 
 module "app_secrets" {
-  source   = "../../modules/secrets_manager"
+  source   = "../../../../modules/secrets_manager"
   App_Name = "${var.APP_NAME}-cms"
   Env_Type = var.ENV
 }
 
 # CloudFront distribution in front of the backend S3 bucket
 module "cloudfront" {
-  source = "../../modules/cloudfront"
+  source = "../../../../modules/cloudfront"
 
   # from S3
   s3_domain          = module.app_s3_bucket.S3-Bucket-Domain
@@ -53,7 +53,7 @@ module "cloudfront" {
 
 
 module "app_ecr" {
-  source               = "../../modules/ecr"
+  source               = "../../../../modules/ecr"
   repository_name      = lower("${var.APP_NAME}-${var.ENV}")
   image_tag_mutability = "MUTABLE"
   scan_on_push         = true
@@ -61,7 +61,7 @@ module "app_ecr" {
 }
 
 module "github_actions_policies" {
-  source      = "../../modules/iam-policy"
+  source      = "../../../../modules/iam-policy"
   name_prefix = lower("${var.APP_NAME}-${var.ENV}-github-actions")
   policy_templates = [
     "ecr_push",
@@ -88,7 +88,7 @@ module "github_actions_policies" {
 
 
 module "github_actions_user" {
-  source    = "../../modules/iam-user"
+  source    = "../../../../modules/iam-user"
   user_name = lower("${var.APP_NAME}-${var.ENV}-github-actions-user")
   app_name  = var.APP_NAME
   env       = var.ENV
@@ -101,7 +101,7 @@ module "github_actions_user" {
 
 # App IAM user for programmatic S3 access from Strapi
 module "app_user_policies" {
-  source      = "../../modules/iam-policy"
+  source      = "../../../../modules/iam-policy"
   name_prefix = lower("${var.APP_NAME}-${var.ENV}-app-user")
   policy_templates = [
     "s3_rw",
@@ -119,7 +119,7 @@ module "app_user_policies" {
 }
 
 module "app_user" {
-  source    = "../../modules/iam-user"
+  source    = "../../../../modules/iam-user"
   user_name = lower("${var.APP_NAME}-${var.ENV}-app-user")
   app_name  = var.APP_NAME
   env       = var.ENV
@@ -132,7 +132,7 @@ module "app_user" {
 
 # SES IAM user for sending emails from Strapi
 # module "ses_user_policies" {
-#   source      = "../../modules/iam-policy"
+#   source      = "../../../../modules/iam-policy"
 #   name_prefix = lower("${var.APP_NAME}-${var.ENV}-ses-user")
 #   policy_templates = [
 #     "ses_send_mail"
@@ -146,7 +146,7 @@ module "app_user" {
 # }
 
 # module "ses_user" {
-#   source    = "../../modules/iam-user"
+#   source    = "../../../../modules/iam-user"
 #   user_name = lower("${var.APP_NAME}-${var.ENV}-ses-user")
 #   app_name  = var.APP_NAME
 #   env       = var.ENV
@@ -159,7 +159,7 @@ module "app_user" {
 
 # EC2 IAM Role managed policies
 module "app_role_policies" {
-  source      = "../../modules/iam-policy"
+  source      = "../../../../modules/iam-policy"
   name_prefix = lower("${var.APP_NAME}-${var.ENV}-app")
   policy_templates = concat(
     [
@@ -198,7 +198,7 @@ module "app_role_policies" {
 
 # Security group for EC2
 module "sg" {
-  source            = "../../modules/sg"
+  source            = "../../../../modules/sg"
   App_Name          = var.APP_NAME
   Env_Type          = var.ENV
   Github_Actions_IP = var.Github_Actions_IP
@@ -220,7 +220,7 @@ data "aws_iam_policy_document" "assume_ec2" {
 }
 
 module "ec2_role" {
-  source             = "../../modules/iam-role"
+  source             = "../../../../modules/iam-role"
   role_name          = lower("${var.APP_NAME}-${var.ENV}-ec2-role")
   assume_role_policy = data.aws_iam_policy_document.assume_ec2.json
   tags               = var.tags
@@ -248,7 +248,7 @@ module "ec2_instance" {
     aws_iam_instance_profile.ec2,
     module.sg
   ]
-  source = "../../modules/ec2"
+  source = "../../../../modules/ec2"
 
 
   App_Name          = var.APP_NAME
@@ -269,7 +269,7 @@ module "ec2_instance" {
 
 # Elastic IP for backend server
 module "backend_eip" {
-  source = "../../modules/eip"
+  source = "../../../../modules/eip"
 
   app_name    = var.APP_NAME
   env_type    = var.ENV

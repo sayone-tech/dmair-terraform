@@ -633,17 +633,17 @@ Auto-generated documentation for Terraform modules and resources.
 
 | Name | Source | Version |
 |------|--------|---------|
-| <a name="module_app_ecr"></a> [app\_ecr](#module\_app\_ecr) | ../../modules/ecr | n/a |
-| <a name="module_app_role_policies"></a> [app\_role\_policies](#module\_app\_role\_policies) | ../../modules/iam-policy | n/a |
-| <a name="module_app_s3_bucket"></a> [app\_s3\_bucket](#module\_app\_s3\_bucket) | ../../modules/s3 | n/a |
-| <a name="module_app_secrets"></a> [app\_secrets](#module\_app\_secrets) | ../../modules/secrets_manager | n/a |
-| <a name="module_app_sqs"></a> [app\_sqs](#module\_app\_sqs) | ../../modules/sqs | n/a |
-| <a name="module_cloudfront"></a> [cloudfront](#module\_cloudfront) | ../../modules/cloudfront | n/a |
-| <a name="module_ec2_instance"></a> [ec2\_instance](#module\_ec2\_instance) | ../../modules/ec2 | n/a |
-| <a name="module_ec2_role"></a> [ec2\_role](#module\_ec2\_role) | ../../modules/iam-role | n/a |
-| <a name="module_jenkins_policies"></a> [jenkins\_policies](#module\_jenkins\_policies) | ../../modules/iam-policy | n/a |
-| <a name="module_jenkins_user"></a> [jenkins\_user](#module\_jenkins\_user) | ../../modules/iam-user | n/a |
-| <a name="module_sg"></a> [sg](#module\_sg) | ../../modules/sg | n/a |
+| <a name="module_app_ecr"></a> [app\_ecr](#module\_app\_ecr) | ../../../../modules/ecr | n/a |
+| <a name="module_app_role_policies"></a> [app\_role\_policies](#module\_app\_role\_policies) | ../../../../modules/iam-policy | n/a |
+| <a name="module_app_s3_bucket"></a> [app\_s3\_bucket](#module\_app\_s3\_bucket) | ../../../../modules/s3 | n/a |
+| <a name="module_app_secrets"></a> [app\_secrets](#module\_app\_secrets) | ../../../../modules/secrets_manager | n/a |
+| <a name="module_app_sqs"></a> [app\_sqs](#module\_app\_sqs) | ../../../../modules/sqs | n/a |
+| <a name="module_cloudfront"></a> [cloudfront](#module\_cloudfront) | ../../../../modules/cloudfront | n/a |
+| <a name="module_ec2_instance"></a> [ec2\_instance](#module\_ec2\_instance) | ../../../../modules/ec2 | n/a |
+| <a name="module_ec2_role"></a> [ec2\_role](#module\_ec2\_role) | ../../../../modules/iam-role | n/a |
+| <a name="module_jenkins_policies"></a> [jenkins\_policies](#module\_jenkins\_policies) | ../../../../modules/iam-policy | n/a |
+| <a name="module_jenkins_user"></a> [jenkins\_user](#module\_jenkins\_user) | ../../../../modules/iam-user | n/a |
+| <a name="module_sg"></a> [sg](#module\_sg) | ../../../../modules/sg | n/a |
 
 ## Resources
 
