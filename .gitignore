@@ -40,6 +40,7 @@ terraform.rc
 # (db_password, jwt_secret_key, mail_password, admin_bootstrap_password)
 # that MUST NOT be committed. Use staging.auto.tfvars.example as the
 # template; CI passes the same values via TF_VAR_* environment variables.
-live/dmair/staging/backend/staging.auto.tfvars
-live/dmair/staging/backend/*.auto.tfvars
-!live/dmair/staging/backend/*.auto.tfvars.example
+live/dmair/backend/staging/staging.auto.tfvars
+live/dmair/backend/staging/*.auto.tfvars
+!live/dmair/backend/staging/*.auto.tfvars.example
+setup-oidc-roles.sh
