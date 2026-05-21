@@ -14,18 +14,6 @@ variable "aws_region" {
   default     = "us-west-2"
 }
 
-variable "aws_profile" {
-  description = "Local AWS named profile resolved from shared credentials. CI assumes a role via OIDC and ignores this."
-  type        = string
-  default     = "dmair"
-}
-
-variable "aws_credentials_file" {
-  description = "Path(s) to the AWS shared credentials file."
-  type        = list(string)
-  default     = ["~/.aws/credentials"]
-}
-
 # --- Networking -----------------------------------------------------------
 
 variable "vpc_cidr" {

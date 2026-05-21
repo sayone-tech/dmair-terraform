@@ -1,7 +1,6 @@
-APP_NAME    = "dmair"
-ENV         = "prod"
-aws_region  = "us-west-2"
-aws_profile = "dmair"
+APP_NAME   = "dmair"
+ENV        = "prod"
+aws_region = "us-west-2"
 
 # CloudFront CDN Configuration (for S3 media/uploads)
 cdn_domain      = "strapi-cdn.dmair.net"                                                                # Your custom CloudFront domain

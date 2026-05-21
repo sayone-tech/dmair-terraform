@@ -119,7 +119,7 @@ Stack-local docs: [`live/dmair/prod/strapi/README.md`](live/dmair/prod/strapi/RE
 
 ```sh
 brew install hashicorp/tap/terraform     # CLI >= 1.10 (workstation runs 1.15.3)
-aws configure list-profiles               # 'dmair' must be present
+aws configure list-profiles              # 'dmair' must be present
 ```
 
 The `dmair` profile must resolve to an IAM identity with:
@@ -128,13 +128,28 @@ The `dmair` profile must resolve to an IAM identity with:
 - `sts:GetCallerIdentity`.
 - Per-stack permissions for the resources actually being managed by that stack.
 
+### Credentials wiring
+
+The repo's `backend.tf` / `providers.tf` do **not** hardcode an AWS profile or shared-credentials path — Terraform falls back to the standard AWS SDK credential chain (env vars → shared credentials file → IMDS). This makes the same code work locally and in OIDC-driven CI without conditionals.
+
+**Locally:** export `AWS_PROFILE` before running Terraform:
+
+```sh
+export AWS_PROFILE=dmair
+terraform init   # picks up dmair profile via the SDK chain
+```
+
+(Or use direnv with a per-repo `.envrc` containing `export AWS_PROFILE=dmair`.)
+
+**In CI:** `aws-actions/configure-aws-credentials@v4` assumes the dmair-terraform OIDC role and exports `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN` / `AWS_REGION` as workflow env vars. Terraform picks them up automatically — no profile lookup happens.
+
 ### Plan + apply a stack
 
 ```sh
 cd live/dmair/prod/strapi          # or any other workspace
-terraform init                      # first time only; -reconfigure if backend.tf changed
-terraform plan                      # MUST report "No changes" against unmodified live infra
-terraform apply                     # type 'yes' if a change is intentional
+terraform init                     # first time only; -reconfigure if backend.tf changed
+terraform plan                     # MUST report "No changes" against unmodified live infra
+terraform apply                    # type 'yes' if a change is intentional
 ```
 
 **Live-infra-is-sacred:** for any refactor commit, every existing live stack's `terraform plan` must report `No changes. Your infrastructure matches the configuration.` That is the hard gate — diff that doesn't match expectation means stop and revert.

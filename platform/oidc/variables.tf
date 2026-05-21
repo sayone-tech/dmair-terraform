@@ -6,18 +6,6 @@ variable "aws_region" {
   default     = "us-west-2"
 }
 
-variable "aws_profile" {
-  description = "Local AWS profile. CI assumes a role via OIDC and ignores this."
-  type        = string
-  default     = "dmair"
-}
-
-variable "aws_credentials_file" {
-  description = "Shared credentials file path(s)."
-  type        = list(string)
-  default     = ["~/.aws/credentials"]
-}
-
 variable "github_org" {
   description = "GitHub org owning the dmair-terraform repository."
   type        = string

@@ -1,7 +1,6 @@
-APP_NAME    = "dmair-frontend"
-ENV         = "prod"
-aws_region  = "us-west-2"
-aws_profile = "dmair"
+APP_NAME   = "dmair-frontend"
+ENV        = "prod"
+aws_region = "us-west-2"
 
 domain            = "www.flydmair.com"
 website_s3_bucket = "www.dmair.net"

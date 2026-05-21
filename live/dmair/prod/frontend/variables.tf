@@ -3,18 +3,6 @@ variable "aws_region" {
   description = "AWS region"
 }
 
-variable "aws_profile" {
-  type        = string
-  description = "AWS profile"
-  default     = "default"
-}
-
-variable "aws_credentials_file" {
-  type        = list(string)
-  default     = ["~/.aws/credentials"]
-  description = "AWS credentials file in local"
-}
-
 variable "APP_NAME" {
   type        = string
   description = "Application name"
