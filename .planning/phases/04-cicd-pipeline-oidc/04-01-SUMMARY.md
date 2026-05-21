@@ -40,4 +40,4 @@ Templates are rendered into managed `aws_iam_policy` resources by `modules/iam-p
 
 ## OIDC identity provider
 
-The account-wide `aws_iam_openid_connect_provider.github` is created in this stack (`platform/oidc/main.tf`). Sibling stacks (`live/dmair/staging/backend/oidc.tf` — the `dmair-backend-staging-deploy` role) reference it via `data "aws_iam_openid_connect_provider"`. Apply `platform/oidc/` BEFORE any stack that defines OIDC-trusted roles.
+The account-wide `aws_iam_openid_connect_provider.github` is created in this stack (`platform/oidc/main.tf`). Sibling stacks (`live/dmair/backend/staging/oidc.tf` — the `dmair-backend-staging-deploy` role) reference it via `data "aws_iam_openid_connect_provider"`. Apply `platform/oidc/` BEFORE any stack that defines OIDC-trusted roles.

@@ -91,7 +91,7 @@
 
 ## Deferred Ideas
 
-- **State-key relocation** to match `live/dmair/<env>/<component>` paths — v2 STATE-01 in REQUIREMENTS.md.
+- **State-key relocation** to match `live/dmair/<component>/<env>` paths — v2 STATE-01 in REQUIREMENTS.md.
 - **Importing bucket policy / lifecycle / logging / replication / ownership controls** of `dmair-terraform-prod` — accepted as drift in v1.
 - **Customer-managed KMS key** for state bucket or lock table — AWS-managed SSE only in v1.
 - **Scripted concurrent-apply test** — manual two-terminal verification only; project excludes managed test tooling per PROJECT.md.

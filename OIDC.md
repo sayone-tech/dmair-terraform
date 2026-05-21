@@ -14,7 +14,7 @@ It satisfies **CICD-02** Phase 4 success criterion: every OIDC role used by auto
 | Audience | `sts.amazonaws.com` |
 | Thumbprint | `6938fd4d98bab03faadb97b34396831e3780aea1` (GitHub's current Actions OIDC root, validated 2026-05) |
 | Defined in | [`platform/oidc/main.tf`](platform/oidc/main.tf) |
-| Referenced by | [`live/dmair/staging/backend/oidc.tf`](live/dmair/staging/backend/oidc.tf) via `data "aws_iam_openid_connect_provider" "github"` |
+| Referenced by | [`live/dmair/backend/staging/oidc.tf`](live/dmair/backend/staging/oidc.tf) via `data "aws_iam_openid_connect_provider" "github"` |
 
 The OIDC provider lives in the `platform/` stack tree because it is an account-wide foundational resource decoupled from any workload. **Apply `platform/oidc/` before any stack that defines an OIDC-trusted role** (currently the staging-backend stack).
 
@@ -90,7 +90,7 @@ There are **four** OIDC-trusted IAM roles. Three belong to the `dmair-terraform`
 
 | Field | Value |
 |---|---|
-| Defined in | [`live/dmair/staging/backend/oidc.tf`](live/dmair/staging/backend/oidc.tf) (Phase 3) |
+| Defined in | [`live/dmair/backend/staging/oidc.tf`](live/dmair/backend/staging/oidc.tf) (Phase 3) |
 | Assumed by | **`dmair-backend` repo's CI** (cross-repo contract) |
 | Workflow job | `deploy-staging` in `bere-creator/dmair-backend` |
 | OIDC sub claim allowed | `repo:sayone-tech/dmair-backend:ref:refs/heads/staging`, `repo:sayone-tech/dmair-backend:environment:staging` |
@@ -155,7 +155,7 @@ Configured under repo Settings → Secrets and variables → Actions → Reposit
 | `STAGING_BACKEND_MAIL_PASSWORD` | same | SendGrid API key |
 | `STAGING_BACKEND_ADMIN_PASSWORD` | same | Initial admin bootstrap password |
 
-These map 1:1 to `var.db_password` / `jwt_secret_key` / `mail_password` / `admin_bootstrap_password` in [`live/dmair/staging/backend/variables.tf`](live/dmair/staging/backend/variables.tf) via `TF_VAR_*` env vars in the workflow.
+These map 1:1 to `var.db_password` / `jwt_secret_key` / `mail_password` / `admin_bootstrap_password` in [`live/dmair/backend/staging/variables.tf`](live/dmair/backend/staging/variables.tf) via `TF_VAR_*` env vars in the workflow.
 
 ---
 

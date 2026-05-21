@@ -13,17 +13,17 @@
 
 ### Refactor — Folder Layout
 
-- [ ] **REFACTOR-01**: The folder layout migrates from `envs/<x>` to `live/dmair/<env>/<component>`. Specifically: `envs/strapi` → `live/dmair/prod/strapi`, `envs/frontend/prod` → `live/dmair/prod/frontend`, `envs/frontend/staging` → `live/dmair/staging/frontend`. State keys at `strapi/`, `frontend/staging/`, `frontend/prod/` remain at their current paths in the bucket (folder rename only).
+- [ ] **REFACTOR-01**: The folder layout migrates from `envs/<x>` to `live/dmair/<component>/<env>`. Specifically: `envs/strapi` → `live/dmair/strapi/prod`, `envs/frontend/prod` → `live/dmair/frontend/prod`, `envs/frontend/staging` → `live/dmair/frontend/staging`. State keys at `strapi/`, `frontend/staging/`, `frontend/prod/` remain at their current paths in the bucket (folder rename only).
 - [ ] **REFACTOR-02**: Every resource address that moves uses a `moved {}` block so that `terraform plan` on each migrated stack reports **"No changes"**. This is the hard exit criterion for the refactor — no exceptions.
 - [ ] **REFACTOR-03**: `live/dmair/staging/` slot is reserved (directory exists with at minimum a placeholder README) for the dmair-backend staging deploy.
 
 ### Documentation
 
-- [ ] **DOCS-01**: README updated to describe the new `live/<project>/<env>/<component>` layout, the `bootstrap/` stack, and the DynamoDB lock table. The legacy "company-website production stack" framing is removed — the docs reflect that this repo owns three live stacks (strapi CMS, frontend prod, frontend staging) plus the new backend staging slot.
+- [ ] **DOCS-01**: README updated to describe the new `live/<project>/<component>/<env>` layout, the `bootstrap/` stack, and the DynamoDB lock table. The legacy "company-website production stack" framing is removed — the docs reflect that this repo owns three live stacks (strapi CMS, frontend prod, frontend staging) plus the new backend staging slot.
 
 ### Staging — dmair-backend Slot
 
-- [ ] **STAGING-01**: `live/dmair/staging/backend/` Terraform stack provisions the full staging AWS resource set per `dmair-backend/deployment/staging/STAGING-DEPLOYMENT.md` §10. Targets `api-staging.flydmair.com`. Required components:
+- [ ] **STAGING-01**: `live/dmair/backend/staging/` Terraform stack provisions the full staging AWS resource set per `dmair-backend/deployment/staging/STAGING-DEPLOYMENT.md` §10. Targets `api-staging.flydmair.com`. Required components:
   - **Networking:** VPC + 2 public subnets across 2 AZs + IGW + route tables (per STAGING-DEPLOYMENT.md §3.1)
   - **Compute:** EC2 `t4g.medium` (Ubuntu 24.04 LTS ARM64) + Elastic IP + EBS encryption at rest
   - **IAM:** EC2 instance role with: SSM Session Manager, ECR pull, Secrets Manager read, CloudWatch logs write
@@ -58,7 +58,7 @@ Deferred to future milestones — tracked but not in this roadmap.
 
 ### State-Key Cleanup
 
-- **STATE-01**: Relocate state keys to match new folder layout (e.g. `strapi/terraform.tfstate` → `live/dmair/prod/strapi/terraform.tfstate`). Deferred — accepted as drift in v1.
+- **STATE-01**: Relocate state keys to match new folder layout (e.g. `strapi/terraform.tfstate` → `live/dmair/strapi/prod/terraform.tfstate`). Deferred — accepted as drift in v1.
 
 ## Out of Scope
 

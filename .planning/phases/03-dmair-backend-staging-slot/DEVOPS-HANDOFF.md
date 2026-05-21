@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-21
 **Branch:** `feature/aws-deployment`
-**Scope:** Stand up the dmair-backend staging slot at `live/dmair/staging/backend/` — VPC, EC2 + EIP, RDS PostgreSQL 16 + PostGIS, ECR, Secrets Manager, CloudWatch, AWS Budget, and the dmair-backend-staging-deploy OIDC role.
+**Scope:** Stand up the dmair-backend staging slot at `live/dmair/backend/staging/` — VPC, EC2 + EIP, RDS PostgreSQL 16 + PostGIS, ECR, Secrets Manager, CloudWatch, AWS Budget, and the dmair-backend-staging-deploy OIDC role.
 
 **Hard prerequisite:** Phases 1 and 2 must be DevOps-applied first. Phase 3 doesn't touch any pre-existing resource, but its `terraform init` writes a new state object to `s3://dmair-terraform-prod/staging/backend/terraform.tfstate` — which requires Phase 1's state bucket adoption + `use_lockfile = true` to be in place.
 
@@ -10,7 +10,7 @@
 
 ## Pre-apply checklist
 
-1. **Phase 1 + Phase 2 applied.** All four existing stacks (`bootstrap`, `live/dmair/prod/strapi`, `live/dmair/prod/frontend`, `live/dmair/staging/frontend`) report `terraform plan` → `No changes`.
+1. **Phase 1 + Phase 2 applied.** All four existing stacks (`bootstrap`, `live/dmair/strapi/prod`, `live/dmair/frontend/prod`, `live/dmair/frontend/staging`) report `terraform plan` → `No changes`.
 2. **dmair AWS profile** is write-capable with at least:
    - `s3:Get/Put/Delete/ListBucket` on `arn:aws:s3:::dmair-terraform-prod`
    - `iam:CreateRole`, `iam:AttachRolePolicy`, `iam:CreateInstanceProfile`, etc. for the dmair-backend-staging-deploy role + the EC2 instance role (the OIDC IDP itself is created by `platform/oidc/`, not here)
@@ -33,7 +33,7 @@ Either of:
 
 **(a) Local tfvars (gitignored):**
 ```sh
-cd live/dmair/staging/backend
+cd live/dmair/backend/staging
 cp staging.auto.tfvars.example staging.auto.tfvars
 # Edit staging.auto.tfvars — replace the four REPLACE_WITH_* values
 ```
@@ -49,7 +49,7 @@ export TF_VAR_admin_bootstrap_password=...
 ### Step 2 — Init + plan + apply
 
 ```sh
-cd live/dmair/staging/backend
+cd live/dmair/backend/staging
 terraform init
 terraform plan      # expect ~30 to add, 0 to change, 0 to destroy
 terraform apply     # answer yes
@@ -161,7 +161,7 @@ Then `/gsd-transition` to advance to Phase 4.
 To roll back the entire staging backend slot:
 
 ```sh
-cd live/dmair/staging/backend
+cd live/dmair/backend/staging
 
 # EIP has prevent_destroy = true — must remove the lifecycle block first if you
 # really want to destroy it (which breaks the DNS record at GoDaddy).
@@ -183,4 +183,4 @@ The OIDC identity provider (`aws_iam_openid_connect_provider.github`) is account
 - **No DNS automation.** GoDaddy is external; the A record is created by hand.
 - **No image push.** Phase 3 creates the empty ECR repo; the first image push is an operator step (see Step 5).
 - **No admin user creation.** Operator runs the bootstrap container via SSM (Step 8).
-- **No staging-frontend changes.** `live/dmair/staging/frontend/` is untouched.
+- **No staging-frontend changes.** `live/dmair/frontend/staging/` is untouched.

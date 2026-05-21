@@ -4,7 +4,7 @@
 **Branch:** `feature/aws-deployment`
 **Scope:** Land the dmair-terraform CI/CD pipeline. PR-gated `terraform plan` (matrix per stack, posts plan as PR comment, blocks merge until plan succeeds). **Apply is manual `workflow_dispatch` only** (per DevOps PR review) — staging dispatches run without a reviewer gate; prod dispatches pause on the `prod` GitHub Environment for reviewer approval.
 
-**Apply order (important):** The `platform/oidc/` stack from Phase 4 creates the GitHub OIDC identity provider — an account-wide resource that `live/dmair/staging/backend/` (Phase 3) `data`-sources. **`platform/oidc/` must be applied BEFORE `live/dmair/staging/backend/`.** Phases 1 + 2 have no dependency on Phase 4.
+**Apply order (important):** The `platform/oidc/` stack from Phase 4 creates the GitHub OIDC identity provider — an account-wide resource that `live/dmair/backend/staging/` (Phase 3) `data`-sources. **`platform/oidc/` must be applied BEFORE `live/dmair/backend/staging/`.** Phases 1 + 2 have no dependency on Phase 4.
 
 ---
 
@@ -33,7 +33,7 @@ terraform apply
 terraform output   # capture the IDP ARN + three role ARNs
 ```
 
-Role ARNs are no longer hardcoded in the workflow — they're set as repo Secrets (Step 3). The OIDC IDP from `terraform output github_oidc_provider_arn` is referenced by `live/dmair/staging/backend/oidc.tf` via a `data` source.
+Role ARNs are no longer hardcoded in the workflow — they're set as repo Secrets (Step 3). The OIDC IDP from `terraform output github_oidc_provider_arn` is referenced by `live/dmair/backend/staging/oidc.tf` via a `data` source.
 
 ### Step 2 — Configure GitHub Environment `prod`
 
@@ -78,18 +78,18 @@ This enforces CICD-01 #1's "merge is blocked until plan succeeds" requirement. (
 
 ### Step 5 — Smoke test — PR plan
 
-Open a no-op PR touching a single stack (e.g., add a comment line to `live/dmair/prod/frontend/main.tf`).
+Open a no-op PR touching a single stack (e.g., add a comment line to `live/dmair/frontend/prod/main.tf`).
 
 - `detect-changes` + `plan` jobs run.
 - `apply-*` jobs do NOT run.
-- A PR comment titled `### terraform plan — live/dmair/prod/frontend` appears.
+- A PR comment titled `### terraform plan — live/dmair/frontend/prod` appears.
 - Merge button is blocked until the plan job succeeds.
 
 Close the PR without merging.
 
 ### Step 6 — Smoke test — manual apply (staging)
 
-Merge a staging-only PR (e.g., touching `live/dmair/staging/frontend/main.tf`).
+Merge a staging-only PR (e.g., touching `live/dmair/frontend/staging/main.tf`).
 
 - The post-merge `plan` job runs against `main` and uploads the plan artifact for review.
 - Apply does NOT auto-run.
@@ -101,14 +101,14 @@ Now manually dispatch the apply:
 
 ### Step 7 — Smoke test — manual apply (prod, the load-bearing test)
 
-Merge a prod-affecting PR (e.g., touching `live/dmair/prod/strapi/output.tf`).
+Merge a prod-affecting PR (e.g., touching `live/dmair/strapi/prod/output.tf`).
 
 - Post-merge `plan` job runs and uploads the plan artifact.
 - Apply does NOT auto-run.
 
 Dispatch:
 
-- Actions → `terraform` → **Run workflow** → pick `live/dmair/prod/strapi` → Run.
+- Actions → `terraform` → **Run workflow** → pick `live/dmair/strapi/prod` → Run.
 - `apply-prod` pauses on the `prod` Environment. Actions UI shows "Review pending deployment".
 - A listed reviewer clicks **Approve and deploy**.
 - `apply-prod` resumes, assumes the `dmair-terraform-prod-apply` role, runs `terraform plan` + `apply`, exits clean.
@@ -118,14 +118,14 @@ Dispatch:
 This proves CICD-02 #3. Open a PR adding an out-of-scope IAM role, e.g.:
 
 ```hcl
-# in live/dmair/prod/strapi/main.tf — DO NOT MERGE; this is a probe.
+# in live/dmair/strapi/prod/main.tf — DO NOT MERGE; this is a probe.
 resource "aws_iam_role" "escalation_probe" {
   name = "not-in-scope-escalation-probe"
   assume_role_policy = jsonencode({ Version = "2012-10-17", Statement = [] })
 }
 ```
 
-Plan succeeds. Merge to main, then **manually dispatch** `apply-prod` against `live/dmair/prod/strapi` (so reviewer approves, role assumes, then terraform tries to create the role). Expected: `AccessDenied: iam:CreateRole` because `not-in-scope-*` doesn't match any prefix in `dmair-terraform-prod-apply`'s policy.
+Plan succeeds. Merge to main, then **manually dispatch** `apply-prod` against `live/dmair/strapi/prod` (so reviewer approves, role assumes, then terraform tries to create the role). Expected: `AccessDenied: iam:CreateRole` because `not-in-scope-*` doesn't match any prefix in `dmair-terraform-prod-apply`'s policy.
 
 Revert the probe commit. The failure log is the evidence — paste it into VERIFICATION.md.
 
@@ -155,9 +155,9 @@ cd platform/oidc
 terraform destroy
 ```
 
-Note that destroying `platform/oidc/` removes both the OIDC IDP **and** the three terraform CI roles — any in-flight Actions runs that were mid-OIDC-assume will error out, and `live/dmair/staging/backend/`'s `data "aws_iam_openid_connect_provider"` lookup will start failing on its next refresh. Coordinate with the team and never destroy `platform/oidc/` while `live/dmair/staging/backend/` is applied.
+Note that destroying `platform/oidc/` removes both the OIDC IDP **and** the three terraform CI roles — any in-flight Actions runs that were mid-OIDC-assume will error out, and `live/dmair/backend/staging/`'s `data "aws_iam_openid_connect_provider"` lookup will start failing on its next refresh. Coordinate with the team and never destroy `platform/oidc/` while `live/dmair/backend/staging/` is applied.
 
-If you need to fully roll back: destroy `live/dmair/staging/backend/` first (which destroys the `dmair-backend-staging-deploy` role too), then `platform/oidc/`.
+If you need to fully roll back: destroy `live/dmair/backend/staging/` first (which destroys the `dmair-backend-staging-deploy` role too), then `platform/oidc/`.
 
 ---
 

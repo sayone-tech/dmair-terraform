@@ -22,16 +22,18 @@ dmair-terraform/
 │                                       # State key: platform/oidc/terraform.tfstate
 │
 ├── live/dmair/                         # Project-keyed live workloads.
-│   ├── prod/
-│   │   ├── strapi/                     # Strapi CMS (cms.flydmair.com).
-│   │   │                               # State key: strapi/terraform.tfstate
-│   │   └── frontend/                   # Marketing/SPA prod
-│   │                                   #   (www.flydmair.com, flydmair.com).
-│   │                                   # State key: frontend/prod/terraform.tfstate
-│   └── staging/
-│       ├── frontend/                   # Staging frontend (staging.flydmair.com).
-│       │                               # State key: frontend/staging/terraform.tfstate
-│       └── backend/                    # dmair-backend staging slot
+│   │                                   # Layout: live/<project>/<component>/<env>/
+│   ├── strapi/
+│   │   └── prod/                       # Strapi CMS (cms.flydmair.com).
+│   │                                   # State key: strapi/terraform.tfstate
+│   ├── frontend/
+│   │   ├── prod/                       # Marketing/SPA prod
+│   │   │                               #   (www.flydmair.com, flydmair.com).
+│   │   │                               # State key: frontend/prod/terraform.tfstate
+│   │   └── staging/                    # Staging frontend (staging.flydmair.com).
+│   │                                   # State key: frontend/staging/terraform.tfstate
+│   └── backend/
+│       └── staging/                    # dmair-backend staging slot
 │                                       #   (api-staging.flydmair.com).
 │                                       # Hosts dmair-backend-staging-deploy OIDC role.
 │                                       # State key: staging/backend/terraform.tfstate
@@ -73,10 +75,10 @@ Every workspace stores Terraform state in a single S3 bucket (`dmair-terraform-p
 |---|---|
 | `bootstrap/`                     | `bootstrap/terraform.tfstate` |
 | `platform/oidc/`                 | `platform/oidc/terraform.tfstate` |
-| `live/dmair/prod/strapi/`        | `strapi/terraform.tfstate` |
-| `live/dmair/prod/frontend/`      | `frontend/prod/terraform.tfstate` |
-| `live/dmair/staging/frontend/`   | `frontend/staging/terraform.tfstate` |
-| `live/dmair/staging/backend/`    | `staging/backend/terraform.tfstate` |
+| `live/dmair/strapi/prod/`        | `strapi/terraform.tfstate` |
+| `live/dmair/frontend/prod/`      | `frontend/prod/terraform.tfstate` |
+| `live/dmair/frontend/staging/`   | `frontend/staging/terraform.tfstate` |
+| `live/dmair/backend/staging/`    | `staging/backend/terraform.tfstate` |
 
 **State locking** uses Terraform 1.10+'s S3-native `use_lockfile = true` — every plan/apply writes a `.tflock` sentinel object alongside the state object in the same bucket prefix. **There is no DynamoDB lock table.** Locking evidence (the `.tflock` object) is observable via `aws s3 ls s3://dmair-terraform-prod/<key-prefix>/` during a held apply.
 
@@ -84,7 +86,7 @@ The `bootstrap/` stack adopts the state bucket itself into IaC via `terraform im
 
 ## Live stacks
 
-### Strapi CMS — `live/dmair/prod/strapi/`
+### Strapi CMS — `live/dmair/strapi/prod/`
 
 **Purpose:** Headless CMS on EC2 backing `cms.flydmair.com`.
 **Domain:** `cms.flydmair.com` (EC2 + Caddy + Let's Encrypt). Media + assets served from `strapi-cdn.flydmair.com` via CloudFront.
@@ -96,9 +98,9 @@ The `bootstrap/` stack adopts the state bucket itself into IaC via `terraform im
 - AWS Secrets Manager for application secrets.
 - IAM: instance role + GitHub Actions deploy user + Strapi app user.
 
-Stack-local docs: [`live/dmair/prod/strapi/README.md`](live/dmair/prod/strapi/README.md), [`ENV_VARS_GUIDE.md`](live/dmair/prod/strapi/ENV_VARS_GUIDE.md), [`GITHUB_ACTIONS_SETUP.md`](live/dmair/prod/strapi/GITHUB_ACTIONS_SETUP.md).
+Stack-local docs: [`live/dmair/strapi/prod/README.md`](live/dmair/strapi/prod/README.md), [`ENV_VARS_GUIDE.md`](live/dmair/strapi/prod/ENV_VARS_GUIDE.md), [`GITHUB_ACTIONS_SETUP.md`](live/dmair/strapi/prod/GITHUB_ACTIONS_SETUP.md).
 
-### Frontend prod — `live/dmair/prod/frontend/`
+### Frontend prod — `live/dmair/frontend/prod/`
 
 **Purpose:** Marketing site + SPA serving `www.flydmair.com` and `flydmair.com`.
 **Resources:**
@@ -108,7 +110,7 @@ Stack-local docs: [`live/dmair/prod/strapi/README.md`](live/dmair/prod/strapi/RE
 - Secrets Manager for build-time env vars.
 - IAM: GitHub Actions deploy user.
 
-### Frontend staging — `live/dmair/staging/frontend/`
+### Frontend staging — `live/dmair/frontend/staging/`
 
 **Purpose:** Pre-production preview at `staging.flydmair.com`.
 **Differs from prod:** adds CloudFront viewer-request `basic_auth.js` (HTTP Basic) to gate access; otherwise identical shape (S3 + CloudFront + OAC + Secrets Manager + IAM deploy user).
@@ -146,7 +148,7 @@ terraform init   # picks up dmair profile via the SDK chain
 ### Plan + apply a stack
 
 ```sh
-cd live/dmair/prod/strapi          # or any other workspace
+cd live/dmair/strapi/prod          # or any other workspace
 terraform init                     # first time only; -reconfigure if backend.tf changed
 terraform plan                     # MUST report "No changes" against unmodified live infra
 terraform apply                    # type 'yes' if a change is intentional
@@ -180,8 +182,8 @@ After apply finishes or is canceled, the `.tflock` sentinel disappears within se
 This repo is mid-migration as of 2026-05. See [`.planning/ROADMAP.md`](.planning/ROADMAP.md) for the four-phase plan:
 
 1. **Phase 1 — Bootstrap State Backend** (in DevOps review): `bootstrap/` stack adopts `dmair-terraform-prod` via import, every live backend rewires to `use_lockfile = true`, two-terminal lock contention proves the lock works.
-2. **Phase 2 — Refactor to `live/` Layout** (in DevOps review): `envs/` → `live/dmair/<env>/<component>/`, README rewrite, staging slot reserved.
-3. **Phase 3 — dmair-backend Staging Slot:** `live/dmair/staging/backend/` (VPC, EC2 + EIP, RDS PostGIS, ECR, Secrets, OIDC role) deployable at `api-staging.flydmair.com`.
+2. **Phase 2 — Refactor to `live/` Layout** (in DevOps review): `envs/` → `live/dmair/<component>/<env>/`, README rewrite, staging slot reserved.
+3. **Phase 3 — dmair-backend Staging Slot:** `live/dmair/backend/staging/` (VPC, EC2 + EIP, RDS PostGIS, ECR, Secrets, OIDC role) deployable at `api-staging.flydmair.com`.
 4. **Phase 4 — CI/CD Pipeline + OIDC:** PR-gated plans + merge-gated applies via GitHub Environments; OIDC trust + role inventory documented in `OIDC.md`.
 
 ## Cross-repo

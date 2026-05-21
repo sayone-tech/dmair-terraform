@@ -33,10 +33,10 @@ on:
         options:
           - bootstrap
           - platform/oidc
-          - live/dmair/prod/strapi
-          - live/dmair/prod/frontend
-          - live/dmair/staging/frontend
-          - live/dmair/staging/backend
+          - live/dmair/strapi/prod
+          - live/dmair/frontend/prod
+          - live/dmair/frontend/staging
+          - live/dmair/backend/staging
 
 permissions:
   contents: read       # checkout
@@ -92,10 +92,10 @@ jobs:
 
           # If anything under modules/ or policies/ changed, plan every stack.
           if echo "$CHANGED" | grep -E '^(modules|policies)/' >/dev/null; then
-            STACKS='["bootstrap","platform/oidc","live/dmair/prod/strapi","live/dmair/prod/frontend","live/dmair/staging/frontend","live/dmair/staging/backend"]'
+            STACKS='["bootstrap","platform/oidc","live/dmair/strapi/prod","live/dmair/frontend/prod","live/dmair/frontend/staging","live/dmair/backend/staging"]'
           else
             STACKS_SET=""
-            for stack in bootstrap platform/oidc live/dmair/prod/strapi live/dmair/prod/frontend live/dmair/staging/frontend live/dmair/staging/backend; do
+            for stack in bootstrap platform/oidc live/dmair/strapi/prod live/dmair/frontend/prod live/dmair/frontend/staging live/dmair/backend/staging; do
               if echo "$CHANGED" | grep -E "^$stack/" >/dev/null; then
                 STACKS_SET="$STACKS_SET \"$stack\","
               fi
@@ -208,14 +208,15 @@ jobs:
   # --------------------------------------------------------------------
   # apply-staging
   # Runs ONLY on workflow_dispatch and ONLY when the operator picks a
-  # live/dmair/staging/* stack. No GitHub Environment gate (staging is
-  # fast-iteration territory). Uses the staging-apply IAM role.
+  # staging stack (path ends with `/staging`). No GitHub Environment
+  # gate (staging is fast-iteration territory). Uses the staging-apply
+  # IAM role.
   # --------------------------------------------------------------------
   apply-staging:
     name: terraform apply (staging) — ${{ github.event.inputs.stack }}
     if: |
       github.event_name == 'workflow_dispatch' &&
-      startsWith(github.event.inputs.stack, 'live/dmair/staging/')
+      endsWith(github.event.inputs.stack, '/staging')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -264,7 +265,7 @@ jobs:
       github.event_name == 'workflow_dispatch' &&
       (github.event.inputs.stack == 'bootstrap' ||
        github.event.inputs.stack == 'platform/oidc' ||
-       startsWith(github.event.inputs.stack, 'live/dmair/prod/'))
+       endsWith(github.event.inputs.stack, '/prod'))
     runs-on: ubuntu-latest
     environment: prod
     steps:

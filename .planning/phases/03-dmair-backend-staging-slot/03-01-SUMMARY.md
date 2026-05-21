@@ -8,7 +8,7 @@ status: code-only-complete
 
 ## Status
 
-**code-only-complete.** 13 `.tf` files for `live/dmair/staging/backend/`, matching `DMAir/dmair-backend/deployment/staging/STAGING-DEPLOYMENT.md` §10 field-for-field with three repo-convention substitutions. `terraform fmt -check` clean. `terraform init` / `apply` deferred to DevOps.
+**code-only-complete.** 13 `.tf` files for `live/dmair/backend/staging/`, matching `DMAir/dmair-backend/deployment/staging/STAGING-DEPLOYMENT.md` §10 field-for-field with three repo-convention substitutions. `terraform fmt -check` clean. `terraform init` / `apply` deferred to DevOps.
 
 ## Substitutions vs. the dmair-backend spec
 
@@ -50,7 +50,7 @@ Nothing in this stack touches any pre-existing resource. The new VPC is independ
 
 ## Key files (created)
 
-- `live/dmair/staging/backend/backend.tf`, `providers.tf`, `variables.tf`
-- `live/dmair/staging/backend/vpc.tf`, `security_groups.tf`
-- `live/dmair/staging/backend/rds.tf`, `secrets.tf`, `ecr.tf`, `cloudwatch.tf`, `iam.tf`
-- `live/dmair/staging/backend/ec2.tf`, `budget.tf`, `oidc.tf`, `outputs.tf`
+- `live/dmair/backend/staging/backend.tf`, `providers.tf`, `variables.tf`
+- `live/dmair/backend/staging/vpc.tf`, `security_groups.tf`
+- `live/dmair/backend/staging/rds.tf`, `secrets.tf`, `ecr.tf`, `cloudwatch.tf`, `iam.tf`
+- `live/dmair/backend/staging/ec2.tf`, `budget.tf`, `oidc.tf`, `outputs.tf`

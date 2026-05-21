@@ -50,7 +50,7 @@ Plan: 6 of 6 (all six plans code-only-complete)
 
 - **Region:** `us-west-2` for all stacks (existing + new staging). EC2 `prevent_destroy = true` blocks a region migration.
 - **Backend staging DNS:** `api-staging.flydmair.com` — avoids collision with existing `staging.flydmair.com` (frontend CloudFront).
-- **Layout:** `live/dmair/<env>/<component>` — project-keyed under `dmair`, matches existing AWS profile name.
+- **Layout:** `live/dmair/<component>/<env>` — project-keyed under `dmair`, matches existing AWS profile name.
 - **Account topology:** single shared `dmair` AWS account; isolation deferred. OIDC scoping in Phase 3 must keep dmair-backend CI from reaching CMS/frontend resources.
 - **Bootstrap stack:** `terraform import` the existing `dmair-terraform-prod` bucket — state backend becomes self-describing IaC. No DynamoDB lock table; locking uses Terraform 1.10+'s S3-native `use_lockfile = true` (decided 2026-05-20, quick-task 260520-ntp).
 - **Terraform pin:** `required_version = "~> 1.15"` across `bootstrap/` and all `envs/*/providers.tf` — `use_lockfile` requires ≥ 1.10; workstation runs 1.15.3.

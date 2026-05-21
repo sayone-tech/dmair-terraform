@@ -6,7 +6,7 @@ AWS infrastructure-as-code repo (Terraform + HCL) that owns the live deployment 
 `flydmair.com` product surface: a Strapi CMS on EC2, the marketing/SPA frontend
 (`www.flydmair.com`, `flydmair.com`), and a staging frontend (`staging.flydmair.com`).
 This GSD milestone takes the repo from "envs/-style scratchpad" to a project-keyed
-`live/<project>/<env>/<component>` layout and adds a real state backend, so that the
+`live/<project>/<component>/<env>` layout and adds a real state backend, so that the
 sibling repo `dmair-backend` can land a staging deployment slot underneath the same
 account.
 
@@ -40,7 +40,7 @@ delivered on top of that invariant, not at the cost of it.
 
 **Phase 9 — Refactor + State Backend (this milestone):**
 
-- [ ] **REFACTOR-01**: Layout migrated from `envs/<x>` to `live/dmair/<env>/<component>`
+- [ ] **REFACTOR-01**: Layout migrated from `envs/<x>` to `live/dmair/<component>/<env>`
   via `moved {}` blocks. Folder names only — state keys stay at current paths
 - [ ] **REFACTOR-02**: `terraform plan` on every existing live stack
   (strapi, frontend-prod, frontend-staging) reports "No changes" after the rename
@@ -53,7 +53,7 @@ delivered on top of that invariant, not at the cost of it.
 
 **dmair-backend staging slot:**
 
-- [ ] **STAGING-01**: `live/dmair/staging/backend/` directory provisioned (Caddy-fronted
+- [ ] **STAGING-01**: `live/dmair/backend/staging/` directory provisioned (Caddy-fronted
   EC2 or equivalent per dmair-backend Phase 9 plan) targeting `api-staging.flydmair.com`
 - [ ] **STAGING-02**: DNS A-record for `api-staging.flydmair.com` pointing at the
   staging backend's Elastic IP; ACM/Let's Encrypt cert acquirable
@@ -148,7 +148,7 @@ the same PR cycle.
 |----------|-----------|---------|
 | Region: `us-west-2` for new backend staging | Share account + state bucket with existing stacks; EC2 `prevent_destroy = true` blocks a region migration anyway | — Pending |
 | Backend staging DNS: `api-staging.flydmair.com` | `staging.flydmair.com` already pinned to frontend CloudFront; rename backend (cheap) instead of migrating frontend DNS (risky) | — Pending |
-| Layout: `live/dmair/<env>/<component>` | Project-keyed under the `dmair` umbrella matches the existing AWS profile name and the seed's reserved `live/dmair/staging` slot | — Pending |
+| Layout: `live/dmair/<component>/<env>` | Project-keyed under the `dmair` umbrella matches the existing AWS profile name and the seed's reserved `live/dmair/staging` slot | — Pending |
 | Account topology: single shared AWS account | Existing reality; isolation deferred until there's a concrete need. Requires careful OIDC scoping for dmair-backend CI | — Pending |
 | Full bootstrap stack (import bucket + add lock table) | State backend becomes self-describing IaC; the lock table closes a real concurrent-apply hole | — Pending |
 | Keep state keys at current paths during folder rename | Avoids per-stack `terraform state mv` migrations. Cost: state-bucket layout drifts from folder layout (acceptable) | — Pending |

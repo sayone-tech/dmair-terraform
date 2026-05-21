@@ -11,7 +11,7 @@
 ## STAGING-01 — `terraform apply` provisions the full staging stack
 
 ```sh
-cd live/dmair/staging/backend
+cd live/dmair/backend/staging
 # Set TF_VAR_db_password / jwt_secret_key / mail_password / admin_bootstrap_password
 # OR populate staging.auto.tfvars (gitignored). Use staging.auto.tfvars.example as the template.
 terraform init
@@ -56,7 +56,7 @@ TODO_DEVOPS: paste outputs from the six commands above (or screenshot the AWS co
 ## STAGING-02 — Existing live stacks untouched
 
 ```sh
-for stack in bootstrap live/dmair/prod/strapi live/dmair/prod/frontend live/dmair/staging/frontend; do
+for stack in bootstrap live/dmair/strapi/prod live/dmair/frontend/prod live/dmair/frontend/staging; do
   echo "=== $stack ==="
   (cd "$stack" && terraform plan)
 done

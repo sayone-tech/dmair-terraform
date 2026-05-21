@@ -15,9 +15,9 @@ find live -type d
 ```
 
 Expected to include (operator verifies):
-- `live/dmair/prod/strapi/`
-- `live/dmair/prod/frontend/`
-- `live/dmair/staging/frontend/`
+- `live/dmair/strapi/prod/`
+- `live/dmair/frontend/prod/`
+- `live/dmair/frontend/staging/`
 - `live/dmair/staging/` (the parent — with the placeholder README)
 
 ```sh
@@ -39,7 +39,7 @@ TODO_DEVOPS: paste `ls envs/` output (or "envs/ removed") here.
 ## Success Criterion 2 — Zero-change plans on all three moved stacks (HARD GATE)
 
 ```sh
-for stack in live/dmair/prod/strapi live/dmair/prod/frontend live/dmair/staging/frontend; do
+for stack in live/dmair/strapi/prod live/dmair/frontend/prod live/dmair/frontend/staging; do
   echo "=== $stack ==="
   (cd "$stack" && terraform init -reconfigure && terraform plan)
 done
@@ -48,15 +48,15 @@ done
 Each `terraform plan` must report `No changes. Your infrastructure matches the configuration.`
 
 ```text
-TODO_DEVOPS: paste live/dmair/prod/strapi terraform plan No-changes output.
+TODO_DEVOPS: paste live/dmair/strapi/prod terraform plan No-changes output.
 ```
 
 ```text
-TODO_DEVOPS: paste live/dmair/prod/frontend terraform plan No-changes output.
+TODO_DEVOPS: paste live/dmair/frontend/prod terraform plan No-changes output.
 ```
 
 ```text
-TODO_DEVOPS: paste live/dmair/staging/frontend terraform plan No-changes output.
+TODO_DEVOPS: paste live/dmair/frontend/staging terraform plan No-changes output.
 ```
 
 If any `terraform init -reconfigure` prompts `Do you want to copy existing state to the new backend?`, answer **NO** and STOP. The state keys are unchanged, so no migration should be needed — a migrate prompt means something's off (stale `.terraform/` cache, or an unintended `backend.tf` edit).
@@ -102,7 +102,7 @@ TODO_DEVOPS: confirm by running the command above and pasting head -5 of the REA
 Spot-check the new `README.md` for:
 
 - [ ] Title is `dmair-terraform`, not "Runway One Aviation".
-- [ ] Directory layout shows `bootstrap/`, `live/dmair/<env>/<component>/`, `modules/`, `policies/`, `.planning/`.
+- [ ] Directory layout shows `bootstrap/`, `live/dmair/<component>/<env>/`, `modules/`, `policies/`, `.planning/`.
 - [ ] Three live stacks (`Strapi CMS`, `Frontend prod`, `Frontend staging`) are each named explicitly.
 - [ ] State backend section mentions `use_lockfile = true` and `.tflock` sentinel.
 - [ ] `bootstrap/` stack is described.

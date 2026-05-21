@@ -15,9 +15,9 @@ status: complete
 Full rewrite of root `README.md`:
 
 - Title: `Infrastructure as Code - Runway One Aviation` → `dmair-terraform`. Legacy "Runway One Aviation" framing dropped entirely (per DOCS-01).
-- Directory layout reflects the new `bootstrap/` + `live/dmair/<env>/<component>/` + `modules/` + `policies/` tree.
+- Directory layout reflects the new `bootstrap/` + `live/dmair/<component>/<env>/` + `modules/` + `policies/` tree.
 - New **State backend** section describes S3-native locking via `use_lockfile = true`, the `.tflock` sentinel object lifecycle, and the per-workspace state-key table. Explicitly notes there is **no DynamoDB lock table**.
-- Three live stacks named individually: Strapi CMS (`live/dmair/prod/strapi/`), Frontend prod (`live/dmair/prod/frontend/`), Frontend staging (`live/dmair/staging/frontend/`) — each with purpose, domain, and resource list.
+- Three live stacks named individually: Strapi CMS (`live/dmair/strapi/prod/`), Frontend prod (`live/dmair/frontend/prod/`), Frontend staging (`live/dmair/frontend/staging/`) — each with purpose, domain, and resource list.
 - New **Operator quick-start** section covers CLI floor (`>= 1.10`), `dmair` profile minimum IAM perms (`s3:Get/Put/Delete/ListBucket` on `dmair-terraform-prod`), plan/apply workflow, and how to observe state locking via `aws s3 ls`.
 - New **Conventions** section lists HCL formatting, module sourcing, provider/CLI pin rules, resource label convention (`.this`), lifecycle locks (CloudFront/EC2/EIP `prevent_destroy = true`), and the secrets-never-committed rule.
 - **Roadmap** pointer + **Cross-repo** contracts (DNS, OIDC role) noted.

@@ -31,4 +31,4 @@ status: code-only-complete
 
 ## Key files (created)
 
-- `live/dmair/staging/backend/user-data.sh`
+- `live/dmair/backend/staging/user-data.sh`

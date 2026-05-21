@@ -8,8 +8,8 @@
 ## Phases
 
 - [ ] **Phase 1: Bootstrap State Backend** - Self-describing state backend + S3-native state locking wired into every existing stack (zero-change-plan gated)
-- [ ] **Phase 2: Refactor to live/ Layout** - `envs/<x>` → `live/dmair/<env>/<component>` via `moved {}` blocks, README updated, staging slot reserved
-- [ ] **Phase 3: dmair-backend Staging Slot** - `live/dmair/staging/backend/` stack with EC2 + Elastic IP + DNS + tag/prefix-scoped OIDC role
+- [ ] **Phase 2: Refactor to live/ Layout** - `envs/<x>` → `live/dmair/<component>/<env>` via `moved {}` blocks, README updated, staging slot reserved
+- [ ] **Phase 3: dmair-backend Staging Slot** - `live/dmair/backend/staging/` stack with EC2 + Elastic IP + DNS + tag/prefix-scoped OIDC role
 - [ ] **Phase 4: CI/CD Pipeline + OIDC** - PR-gated Lint + Plan; merge-gated Apply per stack via GitHub Environments; OIDC trust provider + role inventory in `OIDC.md`
 
 ## Phase Details
@@ -33,26 +33,26 @@
   - [ ] 01-06-PLAN.md — Two-terminal concurrent-lock verification + .tflock object inspection + VERIFICATION.md (BOOTSTRAP-03)
 
 ### Phase 2: Refactor to live/ Layout
-**Goal:** Folder layout is migrated to `live/dmair/<env>/<component>`, all three existing live stacks still plan clean, the staging backend slot directory exists, and the README reflects the new reality.
+**Goal:** Folder layout is migrated to `live/dmair/<component>/<env>`, all three existing live stacks still plan clean, the staging backend slot directory exists, and the README reflects the new reality.
 **Mode:** mvp
 **Depends on:** Phase 1 (locking must be in place before multi-stack folder work)
 **Requirements:** REFACTOR-01, REFACTOR-02, REFACTOR-03, DOCS-01
 **Success Criteria** (what must be TRUE):
-  1. Directory tree shows `live/dmair/prod/strapi/`, `live/dmair/prod/frontend/`, `live/dmair/staging/frontend/`, and `live/dmair/staging/` exists (operator verifies: `find live -type d` lists the four paths and `envs/` no longer contains the moved stacks).
-  2. `terraform plan` in `live/dmair/prod/strapi`, `live/dmair/prod/frontend`, and `live/dmair/staging/frontend` each report "No changes" — every moved resource is covered by a `moved {}` block. This is the hard gate; any non-empty plan diff fails the phase.
+  1. Directory tree shows `live/dmair/strapi/prod/`, `live/dmair/frontend/prod/`, `live/dmair/frontend/staging/`, and `live/dmair/staging/` exists (operator verifies: `find live -type d` lists the four paths and `envs/` no longer contains the moved stacks).
+  2. `terraform plan` in `live/dmair/strapi/prod`, `live/dmair/frontend/prod`, and `live/dmair/frontend/staging` each report "No changes" — every moved resource is covered by a `moved {}` block. This is the hard gate; any non-empty plan diff fails the phase.
   3. State keys at `s3://dmair-terraform-prod/strapi/terraform.tfstate`, `s3://dmair-terraform-prod/frontend/prod/terraform.tfstate`, `s3://dmair-terraform-prod/frontend/staging/terraform.tfstate` are unchanged (operator verifies: `aws s3 ls s3://dmair-terraform-prod/ --recursive` shows the same three keys at the same paths).
   4. `live/dmair/staging/` directory exists with at minimum a placeholder README, reserved for the dmair-backend slot.
-  5. `README.md` describes the new `live/<project>/<env>/<component>` layout, the `bootstrap/` stack, and S3-native state locking (use_lockfile = true); the legacy "company-website production stack" framing is gone and the three live stacks (strapi CMS, frontend prod, frontend staging) are each named explicitly.
+  5. `README.md` describes the new `live/<project>/<component>/<env>` layout, the `bootstrap/` stack, and S3-native state locking (use_lockfile = true); the legacy "company-website production stack" framing is gone and the three live stacks (strapi CMS, frontend prod, frontend staging) are each named explicitly.
 **Plans:** TBD
 
 ### Phase 3: dmair-backend Staging Slot
-**Goal:** A dmair-backend staging stack is deployable into `live/dmair/staging/backend/` under `api-staging.flydmair.com`, and the GitHub OIDC role that drives it can only touch staging-scoped resources — not CMS or frontend.
+**Goal:** A dmair-backend staging stack is deployable into `live/dmair/backend/staging/` under `api-staging.flydmair.com`, and the GitHub OIDC role that drives it can only touch staging-scoped resources — not CMS or frontend.
 **Mode:** mvp
 **Depends on:** Phase 2 (the `live/dmair/staging/` slot must exist)
 **Requirements:** STAGING-01, STAGING-02, STAGING-03
 **Success Criteria** (what must be TRUE):
-  1. `terraform apply` in `live/dmair/staging/backend/` provisions the full staging stack per STAGING-01 (VPC + 2 public subnets + IGW, EC2 `t4g.medium` + Elastic IP, EC2 instance role, security groups, RDS `db.t4g.micro` + PostGIS, ECR repo, consolidated Secrets Manager secret, CloudWatch log group, AWS Budget alarm) and exits 0; a follow-up `terraform plan` in the same directory reports "No changes".
-  2. Existing live stacks remain untouched: `terraform plan` in `live/dmair/prod/strapi`, `live/dmair/prod/frontend`, and `live/dmair/staging/frontend` each still report "No changes" after the staging backend is applied.
+  1. `terraform apply` in `live/dmair/backend/staging/` provisions the full staging stack per STAGING-01 (VPC + 2 public subnets + IGW, EC2 `t4g.medium` + Elastic IP, EC2 instance role, security groups, RDS `db.t4g.micro` + PostGIS, ECR repo, consolidated Secrets Manager secret, CloudWatch log group, AWS Budget alarm) and exits 0; a follow-up `terraform plan` in the same directory reports "No changes".
+  2. Existing live stacks remain untouched: `terraform plan` in `live/dmair/strapi/prod`, `live/dmair/frontend/prod`, and `live/dmair/frontend/staging` each still report "No changes" after the staging backend is applied.
   3. `dig +short api-staging.flydmair.com` resolves to the staging backend's Elastic IP address; `curl -sS https://api-staging.flydmair.com` returns a non-TLS-error response (cert acquirable from the EC2 host via Let's Encrypt / Caddy).
   4. The GitHub OIDC role for `dmair-backend` CI can read/write resources under `live/dmair/staging/*` (operator verifies: assume the role and `aws s3 ls` against the staging backend's bucket succeeds).
   5. Deny-by-exclusion verified: the same OIDC role, when used to attempt `aws s3api get-bucket-policy --bucket <cms-media-bucket>` or modify a `frontend-*` resource, is rejected with an `AccessDenied` / `not authorized` error. The role cannot reach existing `cms-*` / `frontend-*` resources in the shared `dmair` account.

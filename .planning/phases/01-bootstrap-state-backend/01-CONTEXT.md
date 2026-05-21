@@ -106,7 +106,7 @@ A new `bootstrap/` Terraform stack that (a) `terraform import`s the existing `dm
 <deferred>
 ## Deferred Ideas
 
-- **State-key relocation to match `live/dmair/<env>/<component>` folder paths** — tracked as v2 STATE-01 in REQUIREMENTS.md. Folder layout changes in Phase 2; state keys do not move (would require per-stack `terraform state mv`).
+- **State-key relocation to match `live/dmair/<component>/<env>` folder paths** — tracked as v2 STATE-01 in REQUIREMENTS.md. Folder layout changes in Phase 2; state keys do not move (would require per-stack `terraform state mv`).
 - **Importing bucket policy / lifecycle / logging / replication of `dmair-terraform-prod`** — out of scope for v1; accepted as drift between declared HCL and AWS-side state. Revisit if a compliance audit requires fuller IaC coverage.
 - **Customer-managed KMS key for the lock table or state bucket** — AWS-managed SSE only in v1. Revisit if a compliance requirement appears.
 - **Scripted concurrent-apply test** — manual two-terminal verification only in v1; the project explicitly excludes managed test tooling.

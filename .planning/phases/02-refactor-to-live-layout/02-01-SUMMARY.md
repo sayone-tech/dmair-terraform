@@ -4,7 +4,7 @@ plan: 01
 status: code-only-complete
 ---
 
-# Plan 02-01 Summary — Move three live stacks to live/dmair/<env>/<component>/
+# Plan 02-01 Summary — Move three live stacks to live/dmair/<component>/<env>/
 
 ## Status
 
@@ -14,9 +14,9 @@ status: code-only-complete
 
 | From | To | Path bump | Commit |
 |---|---|---|---|
-| `envs/strapi/` | `live/dmair/prod/strapi/` | `../../modules/` → `../../../../modules/` (15 refs in main.tf, 11 refs in README.md) | `eb49d2b` |
-| `envs/frontend/prod/` | `live/dmair/prod/frontend/` | `../../../modules/` → `../../../../modules/` (6 refs in main.tf) | `ec6dc95` |
-| `envs/frontend/staging/` | `live/dmair/staging/frontend/` | `../../../modules/` → `../../../../modules/` (8 refs in main.tf) | `5dbf19b` |
+| `envs/strapi/` | `live/dmair/strapi/prod/` | `../../modules/` → `../../../../modules/` (15 refs in main.tf, 11 refs in README.md) | `eb49d2b` |
+| `envs/frontend/prod/` | `live/dmair/frontend/prod/` | `../../../modules/` → `../../../../modules/` (6 refs in main.tf) | `ec6dc95` |
+| `envs/frontend/staging/` | `live/dmair/frontend/staging/` | `../../../modules/` → `../../../../modules/` (8 refs in main.tf) | `5dbf19b` |
 
 `envs/` directory removed (no remaining content after the three moves).
 
@@ -31,7 +31,7 @@ status: code-only-complete
 ## DevOps verification (phase-wide gate)
 
 ```sh
-for stack in live/dmair/prod/strapi live/dmair/prod/frontend live/dmair/staging/frontend; do
+for stack in live/dmair/strapi/prod live/dmair/frontend/prod live/dmair/frontend/staging; do
   (cd "$stack" && terraform init -reconfigure && terraform plan)
 done
 ```
@@ -44,12 +44,12 @@ Zero AWS-managed resource changes. The rename is purely a filesystem reorg + rel
 
 ## Key files
 
-- moved: `envs/strapi/` → `live/dmair/prod/strapi/` (12 files)
-- moved: `envs/frontend/prod/` → `live/dmair/prod/frontend/` (7 files)
-- moved: `envs/frontend/staging/` → `live/dmair/staging/frontend/` (7 files)
+- moved: `envs/strapi/` → `live/dmair/strapi/prod/` (12 files)
+- moved: `envs/frontend/prod/` → `live/dmair/frontend/prod/` (7 files)
+- moved: `envs/frontend/staging/` → `live/dmair/frontend/staging/` (7 files)
 - removed: `envs/` (empty after moves)
-- modified: `live/dmair/prod/strapi/main.tf` (path bump only)
-- modified: `live/dmair/prod/strapi/README.md` (path bump in terraform-docs table)
-- modified: `live/dmair/prod/frontend/main.tf` (path bump only)
-- modified: `live/dmair/staging/frontend/main.tf` (path bump only)
+- modified: `live/dmair/strapi/prod/main.tf` (path bump only)
+- modified: `live/dmair/strapi/prod/README.md` (path bump in terraform-docs table)
+- modified: `live/dmair/frontend/prod/main.tf` (path bump only)
+- modified: `live/dmair/frontend/staging/main.tf` (path bump only)
 - created: `.planning/phases/02-refactor-to-live-layout/02-01-SUMMARY.md` (this file)

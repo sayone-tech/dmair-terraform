@@ -62,7 +62,7 @@ The research established that the operator cannot inspect the live `dmair-terraf
 
 ### Deferred Ideas (OUT OF SCOPE)
 
-- State-key relocation to match `live/dmair/<env>/<component>` folder paths — tracked as v2 STATE-01.
+- State-key relocation to match `live/dmair/<component>/<env>` folder paths — tracked as v2 STATE-01.
 - Importing bucket policy / lifecycle / logging / replication of `dmair-terraform-prod` — accepted as drift in v1.
 - Customer-managed KMS key for the lock table or state bucket — AWS-managed SSE only in v1.
 - Scripted concurrent-apply test — manual two-terminal verification only.
