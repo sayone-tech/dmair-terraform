@@ -16,7 +16,12 @@ dmair-terraform/
 │                                       # Adopts pre-existing dmair-terraform-prod.
 │                                       # State key: bootstrap/terraform.tfstate
 │
-├── live/dmair/                         # Project-keyed live infrastructure.
+├── platform/                           # Account-wide foundational resources.
+│   └── oidc/                           # GitHub Actions OIDC IDP + dmair-terraform CI
+│                                       # roles (plan-readonly, staging-apply, prod-apply).
+│                                       # State key: platform/oidc/terraform.tfstate
+│
+├── live/dmair/                         # Project-keyed live workloads.
 │   ├── prod/
 │   │   ├── strapi/                     # Strapi CMS (cms.flydmair.com).
 │   │   │                               # State key: strapi/terraform.tfstate
@@ -26,8 +31,10 @@ dmair-terraform/
 │   └── staging/
 │       ├── frontend/                   # Staging frontend (staging.flydmair.com).
 │       │                               # State key: frontend/staging/terraform.tfstate
-│       └── backend/                    # dmair-backend staging slot — reserved.
-│                                       # Created in Phase 3 (api-staging.flydmair.com).
+│       └── backend/                    # dmair-backend staging slot
+│                                       #   (api-staging.flydmair.com).
+│                                       # Hosts dmair-backend-staging-deploy OIDC role.
+│                                       # State key: staging/backend/terraform.tfstate
 │
 ├── modules/                            # Reusable local Terraform modules.
 │   ├── cloudfront/                     #   CloudFront distribution + OAC.
@@ -43,12 +50,17 @@ dmair-terraform/
 │   └── sg/                             #   Security group with default ingress.
 │
 ├── policies/                           # IAM policy JSON templates (templatefile).
-│   ├── s3_rw.tpl
-│   ├── ecr_push.tpl / ecr_pull.tpl
+│   ├── s3_rw.tpl                       #   App data buckets
+│   ├── ecr_push.tpl / ecr_pull.tpl     #   Container registry access
 │   ├── cloudfront_invalidate.tpl
 │   ├── secrets_manager_read.tpl
 │   ├── sg_manage.tpl
-│   └── ses_send_mail.tpl
+│   ├── ses_send_mail.tpl
+│   ├── ec2_app_runtime.tpl             #   EC2 instance role (Phase 3)
+│   ├── github_app_deploy.tpl           #   dmair-backend-staging-deploy role
+│   ├── tf_plan_readonly.tpl            #   Terraform CI plan role
+│   ├── tf_staging_apply.tpl            #   Terraform CI staging-apply role
+│   └── tf_prod_apply.tpl               #   Terraform CI prod-apply role
 │
 └── .planning/                          # GSD workflow artifacts (ROADMAP, phases, state).
 ```
@@ -60,10 +72,11 @@ Every workspace stores Terraform state in a single S3 bucket (`dmair-terraform-p
 | Workspace | State key |
 |---|---|
 | `bootstrap/`                     | `bootstrap/terraform.tfstate` |
+| `platform/oidc/`                 | `platform/oidc/terraform.tfstate` |
 | `live/dmair/prod/strapi/`        | `strapi/terraform.tfstate` |
 | `live/dmair/prod/frontend/`      | `frontend/prod/terraform.tfstate` |
 | `live/dmair/staging/frontend/`   | `frontend/staging/terraform.tfstate` |
-| `live/dmair/staging/backend/`    | `staging/backend/terraform.tfstate` _(Phase 3)_ |
+| `live/dmair/staging/backend/`    | `staging/backend/terraform.tfstate` |
 
 **State locking** uses Terraform 1.10+'s S3-native `use_lockfile = true` — every plan/apply writes a `.tflock` sentinel object alongside the state object in the same bucket prefix. **There is no DynamoDB lock table.** Locking evidence (the `.tflock` object) is observable via `aws s3 ls s3://dmair-terraform-prod/<key-prefix>/` during a held apply.
 

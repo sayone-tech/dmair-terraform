@@ -35,10 +35,10 @@ output "cloudwatch_log_group" {
 
 output "dmair_backend_staging_deploy_role_arn" {
   description = "Cross-repo contract — the dmair-backend CI assumes this role via OIDC. CHANGE WITH CARE."
-  value       = aws_iam_role.dmair_backend_staging_deploy.arn
+  value       = module.dmair_backend_staging_deploy_role.role_arn
 }
 
 output "github_oidc_provider_arn" {
-  description = "Account-wide GitHub Actions OIDC provider ARN. Sibling stacks should `data` it, not recreate."
-  value       = aws_iam_openid_connect_provider.github.arn
+  description = "Account-wide GitHub Actions OIDC provider ARN (managed in platform/oidc/; data-sourced here)."
+  value       = data.aws_iam_openid_connect_provider.github.arn
 }

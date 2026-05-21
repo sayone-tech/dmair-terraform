@@ -1,6 +1,9 @@
 # IAM for the EC2 instance — pulls images from ECR, reads the app secret,
 # writes container logs to CloudWatch, registers with SSM for Session
 # Manager / Run Command access. NO inbound SSH; SSM is the access path.
+#
+# Permission policy is rendered from policies/ec2_app_runtime.tpl via
+# modules/iam-policy. Role + attachments are composed via modules/iam-role.
 
 data "aws_iam_policy_document" "ec2_assume" {
   statement {
@@ -12,62 +15,36 @@ data "aws_iam_policy_document" "ec2_assume" {
   }
 }
 
-resource "aws_iam_role" "ec2" {
-  name               = "dmair-staging-ec2-role"
+module "ec2_runtime_policy" {
+  source           = "../../../../modules/iam-policy"
+  name_prefix      = "dmair-staging-ec2"
+  policy_templates = ["ec2_app_runtime"]
+
+  template_vars = {
+    ec2_app_runtime = {
+      ecr_repository_arn = aws_ecr_repository.app.arn
+      app_secret_arn     = aws_secretsmanager_secret.app.arn
+      log_group_arn      = aws_cloudwatch_log_group.staging.arn
+    }
+  }
+
+  tags = { Name = "dmair-staging-ec2" }
+}
+
+module "ec2_role" {
+  source             = "../../../../modules/iam-role"
+  role_name          = "dmair-staging-ec2-role"
   assume_role_policy = data.aws_iam_policy_document.ec2_assume.json
 
-  tags = {
-    Name = "dmair-staging-ec2-role"
-  }
-}
-
-data "aws_iam_policy_document" "ec2_perms" {
-  statement {
-    sid       = "EcrAuth"
-    actions   = ["ecr:GetAuthorizationToken"]
-    resources = ["*"]
+  policy_arns_map = {
+    runtime = module.ec2_runtime_policy.policy_arns_map["ec2_app_runtime"]
+    ssm     = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
   }
 
-  statement {
-    sid = "EcrPull"
-    actions = [
-      "ecr:BatchGetImage",
-      "ecr:GetDownloadUrlForLayer",
-      "ecr:BatchCheckLayerAvailability",
-    ]
-    resources = [aws_ecr_repository.app.arn]
-  }
-
-  statement {
-    sid       = "ReadAppSecret"
-    actions   = ["secretsmanager:GetSecretValue"]
-    resources = [aws_secretsmanager_secret.app.arn]
-  }
-
-  statement {
-    sid = "WriteLogs"
-    actions = [
-      "logs:CreateLogStream",
-      "logs:PutLogEvents",
-    ]
-    resources = ["${aws_cloudwatch_log_group.staging.arn}:*"]
-  }
-}
-
-resource "aws_iam_role_policy" "ec2" {
-  name   = "dmair-staging-ec2-policy"
-  role   = aws_iam_role.ec2.id
-  policy = data.aws_iam_policy_document.ec2_perms.json
+  tags = { Name = "dmair-staging-ec2-role" }
 }
 
 resource "aws_iam_instance_profile" "ec2" {
   name = "dmair-staging-ec2-profile"
-  role = aws_iam_role.ec2.name
-}
-
-# AWS-managed SSM policy so the box registers with SSM (Session Manager,
-# Run Command). Eliminates the need for inbound port 22.
-resource "aws_iam_role_policy_attachment" "ec2_ssm" {
-  role       = aws_iam_role.ec2.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+  role = module.ec2_role.role_name
 }

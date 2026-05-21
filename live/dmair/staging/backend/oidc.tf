@@ -1,31 +1,19 @@
-# GitHub OIDC trust + dmair-backend-staging-deploy IAM role.
+# dmair-backend-staging-deploy — cross-repo OIDC contract.
 #
-# The OIDC identity provider is account-wide. We create it here in the
-# staging-backend stack because it's the first place that needs it. Future
-# stacks (Phase 4 CI/CD will define a sibling terraform-apply role) can
-# reference it via `data "aws_iam_openid_connect_provider" "github"` instead
-# of recreating it. If a later stack chooses to manage the provider itself,
-# move via `terraform state mv`.
+# The GitHub OIDC identity provider itself is managed in platform/oidc/
+# (account-wide singleton); we data-source it here. Apply platform/oidc/
+# BEFORE applying this stack.
 #
-# Role scope: dmair-backend-staging-deploy is the cross-repo contract role
-# for the dmair-backend CI's staging deploy job. It can:
-#   - push/pull the dmair-backend ECR repo
-#   - read the dmair/staging/app Secrets Manager secret
-#   - run an SSM command / start a Session Manager session against the
-#     staging EC2 instance
-# It CANNOT touch any cms-* / frontend-* / strapi-* resource (deny-by-
-# exclusion: no wildcards in the resource ARNs).
+# Role scope (STAGING-03 deny-by-exclusion — no resource wildcards):
+#   - ECR auth + push/pull on the dmair-backend repo only
+#   - Secrets Manager GetSecretValue on dmair/staging/app only
+#   - SSM SendCommand / StartSession / Describe* on the staging EC2
+#     instance only, plus the AWS-RunShellScript document
+#
+# Permission policy rendered from policies/github_app_deploy.tpl.
 
-resource "aws_iam_openid_connect_provider" "github" {
-  url            = "https://token.actions.githubusercontent.com"
-  client_id_list = ["sts.amazonaws.com"]
-  thumbprint_list = [
-    "6938fd4d98bab03faadb97b34396831e3780aea1", # GitHub's current Actions OIDC thumbprint (2026-05)
-  ]
-
-  tags = {
-    Name = "github-actions-oidc"
-  }
+data "aws_iam_openid_connect_provider" "github" {
+  url = "https://token.actions.githubusercontent.com"
 }
 
 data "aws_iam_policy_document" "dmair_backend_staging_deploy_trust" {
@@ -34,7 +22,7 @@ data "aws_iam_policy_document" "dmair_backend_staging_deploy_trust" {
 
     principals {
       type        = "Federated"
-      identifiers = [aws_iam_openid_connect_provider.github.arn]
+      identifiers = [data.aws_iam_openid_connect_provider.github.arn]
     }
 
     condition {
@@ -43,8 +31,7 @@ data "aws_iam_policy_document" "dmair_backend_staging_deploy_trust" {
       values   = ["sts.amazonaws.com"]
     }
 
-    # Allow specific refs / environments only — staging-track refs from the
-    # dmair-backend repo. See variables.tf var.github_deploy_branches.
+    # Restrict to staging-track refs from the dmair-backend repo only.
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
@@ -56,62 +43,33 @@ data "aws_iam_policy_document" "dmair_backend_staging_deploy_trust" {
   }
 }
 
-resource "aws_iam_role" "dmair_backend_staging_deploy" {
-  name                 = "dmair-backend-staging-deploy"
-  description          = "OIDC role assumed by dmair-backend CI for staging-track deploys"
-  assume_role_policy   = data.aws_iam_policy_document.dmair_backend_staging_deploy_trust.json
-  max_session_duration = 3600
+module "dmair_backend_staging_deploy_policy" {
+  source           = "../../../../modules/iam-policy"
+  name_prefix      = "dmair-backend-staging-deploy"
+  policy_templates = ["github_app_deploy"]
 
-  tags = {
-    Name = "dmair-backend-staging-deploy"
+  template_vars = {
+    github_app_deploy = {
+      ecr_repository_arn = aws_ecr_repository.app.arn
+      app_secret_arn     = aws_secretsmanager_secret.app.arn
+      ssm_resource_arns = [
+        aws_instance.app.arn,
+        "arn:aws:ssm:${var.aws_region}::document/AWS-RunShellScript",
+      ]
+    }
   }
+
+  tags = { Name = "dmair-backend-staging-deploy" }
 }
 
-data "aws_iam_policy_document" "dmair_backend_staging_deploy_perms" {
-  statement {
-    sid       = "EcrAuth"
-    actions   = ["ecr:GetAuthorizationToken"]
-    resources = ["*"] # required: not resource-scopable
+module "dmair_backend_staging_deploy_role" {
+  source             = "../../../../modules/iam-role"
+  role_name          = "dmair-backend-staging-deploy"
+  assume_role_policy = data.aws_iam_policy_document.dmair_backend_staging_deploy_trust.json
+
+  policy_arns_map = {
+    deploy = module.dmair_backend_staging_deploy_policy.policy_arns_map["github_app_deploy"]
   }
 
-  statement {
-    sid = "EcrPushPull"
-    actions = [
-      "ecr:BatchGetImage",
-      "ecr:GetDownloadUrlForLayer",
-      "ecr:BatchCheckLayerAvailability",
-      "ecr:PutImage",
-      "ecr:InitiateLayerUpload",
-      "ecr:UploadLayerPart",
-      "ecr:CompleteLayerUpload",
-    ]
-    resources = [aws_ecr_repository.app.arn]
-  }
-
-  statement {
-    sid       = "ReadAppSecret"
-    actions   = ["secretsmanager:GetSecretValue"]
-    resources = [aws_secretsmanager_secret.app.arn]
-  }
-
-  statement {
-    sid = "SsmDeployRollEc2"
-    actions = [
-      "ssm:SendCommand",
-      "ssm:StartSession",
-      "ssm:DescribeInstanceInformation",
-      "ssm:GetCommandInvocation",
-    ]
-    resources = [
-      aws_instance.app.arn,
-      # SSM SendCommand also requires document ARNs:
-      "arn:aws:ssm:${var.aws_region}::document/AWS-RunShellScript",
-    ]
-  }
-}
-
-resource "aws_iam_role_policy" "dmair_backend_staging_deploy" {
-  name   = "dmair-backend-staging-deploy-policy"
-  role   = aws_iam_role.dmair_backend_staging_deploy.id
-  policy = data.aws_iam_policy_document.dmair_backend_staging_deploy_perms.json
+  tags = { Name = "dmair-backend-staging-deploy" }
 }

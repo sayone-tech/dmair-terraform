@@ -34,7 +34,7 @@ status: code-only-complete
 | `iam.tf` | EC2 instance role + policies (ECR read, Secrets read, Logs write) + instance profile + AWS-managed `AmazonSSMManagedInstanceCore` attachment. |
 | `ec2.tf` | `t4g.medium`, Ubuntu 24.04 LTS ARM64 from Canonical SSM param, IMDSv2-only, 30 GB gp3 encrypted root, `user_data = templatefile("./user-data.sh", {...})`, `ignore_changes = [ami]`. Companion EIP with `prevent_destroy = true`. |
 | `budget.tf` | Monthly $60 ACTUAL cap (var-driven), 80% threshold email to `ops@flydmair.com` (var-driven). Filtered to `user:Project$dmair` + `user:Environment$staging` tags. |
-| `oidc.tf` | GitHub OIDC identity provider (account-wide) + `dmair-backend-staging-deploy` IAM role. Trust policy restricts `sub` claim to `repo:sayone-tech/dmair-backend:ref:refs/heads/staging` + `:environment:staging`. Scoped permission policy (no wildcards) — STAGING-03 deny-by-exclusion. |
+| `oidc.tf` | `dmair-backend-staging-deploy` IAM role (the OIDC identity provider itself lives in `platform/oidc/` — `data`-sourced here). Trust policy restricts `sub` claim to `repo:sayone-tech/dmair-backend:ref:refs/heads/staging` + `:environment:staging`. Permission policy rendered from `policies/github_app_deploy.tpl` via `modules/iam-policy` — STAGING-03 deny-by-exclusion via per-ARN scoping. |
 | `outputs.tf` | EIP, EC2 instance ID, SSM-session command, RDS endpoint, ECR URL, secret ARN, log group, OIDC role ARN, OIDC provider ARN. |
 
 ## DevOps blockers (must resolve before apply)

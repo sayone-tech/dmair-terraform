@@ -13,7 +13,7 @@
 1. **Phase 1 + Phase 2 applied.** All four existing stacks (`bootstrap`, `live/dmair/prod/strapi`, `live/dmair/prod/frontend`, `live/dmair/staging/frontend`) report `terraform plan` → `No changes`.
 2. **dmair AWS profile** is write-capable with at least:
    - `s3:Get/Put/Delete/ListBucket` on `arn:aws:s3:::dmair-terraform-prod`
-   - `iam:*` for creating the OIDC provider + role
+   - `iam:CreateRole`, `iam:AttachRolePolicy`, `iam:CreateInstanceProfile`, etc. for the dmair-backend-staging-deploy role + the EC2 instance role (the OIDC IDP itself is created by `platform/oidc/`, not here)
    - `ec2:*`, `vpc:*`, `rds:*`, `ecr:*`, `secretsmanager:*`, `logs:*`, `budgets:*`, `ssm:GetParameter` on the relevant scopes
 3. **The four sensitive vars** are decided and ready:
    - `db_password` — strong, generated.
@@ -21,7 +21,7 @@
    - `mail_password` — SendGrid API key (sandbox is fine for staging).
    - `admin_bootstrap_password` — 12–128 chars.
 4. **GoDaddy DNS access** for the `flydmair.com` zone (you'll add an A record after the apply).
-5. **Cross-repo coordination ready** — once the OIDC role ARN is output by `terraform apply`, paste it into the `dmair-backend` repo's `.github/workflows/deploy-staging.yml` (Phase 4 will codify this; for now it's a one-off coordination).
+5. **Cross-repo coordination ready** — once the `dmair-backend-staging-deploy` role ARN is output by `terraform apply`, paste it into the `dmair-backend` repo's `.github/workflows/deploy-staging.yml`.
 
 ---
 
@@ -173,7 +173,7 @@ terraform destroy         # answer yes
 git revert <phase-3-shas>
 ```
 
-Note that the OIDC identity provider (`aws_iam_openid_connect_provider.github`) is account-wide and may be referenced by Phase 4. If you destroy it, Phase 4 must `terraform import` it back. Easier path: leave it alone during a rollback; only destroy the stack-specific resources.
+The OIDC identity provider (`aws_iam_openid_connect_provider.github`) is account-wide and managed by `platform/oidc/` — not by this stack. A Phase 3 destroy removes only the `dmair-backend-staging-deploy` role; the IDP and the terraform CI roles in `platform/oidc/` stay intact.
 
 ---
 

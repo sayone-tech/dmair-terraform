@@ -16,7 +16,7 @@ provider "aws" {
   default_tags {
     tags = {
       Project   = "dmair"
-      Component = "ci"
+      Component = "platform-oidc"
       ManagedBy = "terraform"
     }
   }

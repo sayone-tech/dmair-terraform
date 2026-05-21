@@ -74,7 +74,7 @@ The user-confirmed Phase 4 scope excluded a static security-scan job ("no manage
 
 ## DevOps post-apply tasks
 
-1. Apply `ci/` once (locally with the `dmair` profile, or via `terraform apply` as the bootstrapping operator). This creates the three IAM roles before the workflow can assume them.
+1. Apply `platform/oidc/` once (locally with the `dmair` profile, or via `terraform apply` as the bootstrapping operator). This creates the three IAM roles before the workflow can assume them.
 2. Configure repo Settings → Environments → `prod` with required reviewers.
 3. Add the four `STAGING_BACKEND_*` repo Secrets (same values used in Phase 3 `staging.auto.tfvars`).
 4. Push a trivial no-op change to a feature branch and open a PR; confirm `plan` job runs and posts a PR comment, `apply-*` jobs do NOT run.

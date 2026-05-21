@@ -1,0 +1,59 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "StateBucketRead",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:ListBucket"],
+      "Resource": [
+        "${state_bucket_arn}",
+        "${state_bucket_arn}/*"
+      ]
+    },
+    {
+      "Sid": "StateLockfileRw",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:DeleteObject"],
+      "Resource": "${state_bucket_arn}/*.tflock"
+    },
+    {
+      "Sid": "DescribeAllForRefresh",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:Describe*",
+        "ec2:Get*",
+        "rds:Describe*",
+        "rds:ListTagsForResource",
+        "ecr:Describe*",
+        "ecr:List*",
+        "ecr:Get*",
+        "ecr:BatchGetImage",
+        "secretsmanager:Describe*",
+        "secretsmanager:ListSecret*",
+        "secretsmanager:GetResourcePolicy",
+        "iam:Get*",
+        "iam:List*",
+        "cloudfront:Get*",
+        "cloudfront:List*",
+        "s3:GetBucket*",
+        "s3:GetEncryptionConfiguration",
+        "s3:GetLifecycleConfiguration",
+        "s3:GetObjectTagging",
+        "s3:ListAllMyBuckets",
+        "logs:Describe*",
+        "logs:List*",
+        "ssm:Get*",
+        "ssm:Describe*",
+        "ssm:List*",
+        "route53:Get*",
+        "route53:List*",
+        "acm:Describe*",
+        "acm:List*",
+        "budgets:Describe*",
+        "budgets:View*",
+        "sts:GetCallerIdentity"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

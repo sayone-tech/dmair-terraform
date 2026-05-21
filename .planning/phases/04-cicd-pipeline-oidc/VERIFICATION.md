@@ -8,12 +8,12 @@
 
 ---
 
-## Pre-verification — Apply `ci/`
+## Pre-verification — Apply `platform/oidc/`
 
 The CI roles must exist before the workflow can assume them. This is a one-time bootstrap step run by an operator with full IAM perms (not via the workflow itself — circular dependency otherwise).
 
 ```sh
-cd ci
+cd platform/oidc
 terraform init
 terraform plan        # expect ~5 resources to add (3 roles, 3 inline policies)
 terraform apply       # answer yes
@@ -24,16 +24,14 @@ terraform output
 TODO_DEVOPS: paste `terraform output` showing the three role ARNs + the OIDC provider ARN.
 ```
 
-Confirm the three role ARNs match the env vars in `.github/workflows/terraform.yml`:
+Copy each `terraform output` value into a repo Secret (Step 3 below). The workflow no longer hardcodes ARNs — secret names map 1:1:
 
-- `PLAN_ROLE_ARN` should equal `terraform output plan_readonly_role_arn`
-- `STAGING_APPLY_ROLE_ARN` should equal `terraform output staging_apply_role_arn`
-- `PROD_APPLY_ROLE_ARN` should equal `terraform output prod_apply_role_arn`
-
-If the account ID in the workflow's hardcoded ARNs (`071297531943`) doesn't match `data.aws_caller_identity.current.account_id`, fix the workflow env block first.
+- `terraform output plan_readonly_role_arn` → repo Secret `AWS_PLAN_ROLE_ARN`
+- `terraform output staging_apply_role_arn` → repo Secret `AWS_STAGING_APPLY_ROLE_ARN`
+- `terraform output prod_apply_role_arn` → repo Secret `AWS_PROD_APPLY_ROLE_ARN`
 
 ```text
-TODO_DEVOPS: confirm three ARNs match the workflow env vars (or note discrepancies).
+TODO_DEVOPS: confirm three Secrets are populated with the matching role ARNs.
 ```
 
 ---

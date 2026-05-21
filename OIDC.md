@@ -13,19 +13,10 @@ It satisfies **CICD-02** Phase 4 success criterion: every OIDC role used by auto
 | Provider URL | `https://token.actions.githubusercontent.com` |
 | Audience | `sts.amazonaws.com` |
 | Thumbprint | `6938fd4d98bab03faadb97b34396831e3780aea1` (GitHub's current Actions OIDC root, validated 2026-05) |
-| Created in | [`live/dmair/staging/backend/oidc.tf`](live/dmair/staging/backend/oidc.tf) (Phase 3) |
-| Referenced by | [`ci/main.tf`](ci/main.tf) via `data "aws_iam_openid_connect_provider" "github"` (Phase 4) |
+| Defined in | [`platform/oidc/main.tf`](platform/oidc/main.tf) |
+| Referenced by | [`live/dmair/staging/backend/oidc.tf`](live/dmair/staging/backend/oidc.tf) via `data "aws_iam_openid_connect_provider" "github"` |
 
-> **Future improvement:** the OIDC provider currently lives inside the `live/dmair/staging/backend/` stack — that means destroying the staging backend would tear down all OIDC trust account-wide. Move it to the `ci/` stack via:
-> ```sh
-> # source-side: comment out aws_iam_openid_connect_provider.github in live/dmair/staging/backend/oidc.tf
-> # destination-side: add it to ci/main.tf
-> terraform -chdir=ci state mv -state-out=ci/terraform.tfstate \
->   '-state=live/dmair/staging/backend/terraform.tfstate' \
->   aws_iam_openid_connect_provider.github \
->   aws_iam_openid_connect_provider.github
-> ```
-> Tracked as a v2 improvement; the current setup is correct but coupled.
+The OIDC provider lives in the `platform/` stack tree because it is an account-wide foundational resource decoupled from any workload. **Apply `platform/oidc/` before any stack that defines an OIDC-trusted role** (currently the staging-backend stack).
 
 ---
 
@@ -37,7 +28,7 @@ There are **four** OIDC-trusted IAM roles. Three belong to the `dmair-terraform`
 
 | Field | Value |
 |---|---|
-| Defined in | [`ci/main.tf`](ci/main.tf) |
+| Defined in | [`platform/oidc/main.tf`](platform/oidc/main.tf) |
 | Assumed by | `dmair-terraform` CI |
 | Workflow job | `plan` (every PR + push-to-main) |
 | OIDC sub claim allowed | `repo:sayone-tech/dmair-terraform:pull_request*`, `repo:sayone-tech/dmair-terraform:ref:refs/heads/main*` |
@@ -54,7 +45,7 @@ There are **four** OIDC-trusted IAM roles. Three belong to the `dmair-terraform`
 
 | Field | Value |
 |---|---|
-| Defined in | [`ci/main.tf`](ci/main.tf) |
+| Defined in | [`platform/oidc/main.tf`](platform/oidc/main.tf) |
 | Assumed by | `dmair-terraform` CI |
 | Workflow job | `apply-staging` (push-to-main only, no reviewer gate) |
 | OIDC sub claim allowed | `repo:sayone-tech/dmair-terraform:ref:refs/heads/main` |
@@ -76,7 +67,7 @@ There are **four** OIDC-trusted IAM roles. Three belong to the `dmair-terraform`
 
 | Field | Value |
 |---|---|
-| Defined in | [`ci/main.tf`](ci/main.tf) |
+| Defined in | [`platform/oidc/main.tf`](platform/oidc/main.tf) |
 | Assumed by | `dmair-terraform` CI |
 | Workflow job | `apply-prod` (push-to-main + `environment: prod`) |
 | OIDC sub claim allowed | `repo:sayone-tech/dmair-terraform:environment:prod` |
@@ -136,8 +127,8 @@ When a `terraform.yml` workflow run reaches the `apply-prod` job, GitHub pauses 
 The current `dmair-terraform-staging-apply` role does not require a GitHub Environment. If you want to add one (e.g. for environment-scoped secrets):
 
 - Add `environment: staging` to the `apply-staging` job in `.github/workflows/terraform.yml`
-- Add `repo:sayone-tech/dmair-terraform:environment:staging` to `var.staging_apply_subjects` in [`ci/variables.tf`](ci/variables.tf)
-- Re-apply the `ci/` stack
+- Add `repo:sayone-tech/dmair-terraform:environment:staging` to `var.staging_apply_subjects` in [`platform/oidc/variables.tf`](platform/oidc/variables.tf)
+- Re-apply the `platform/oidc/` stack
 
 ---
 
@@ -188,7 +179,7 @@ This list lives in [GitHub's docs](https://docs.github.com/en/actions/deployment
 
 See [`.planning/phases/04-cicd-pipeline-oidc/VERIFICATION.md`](.planning/phases/04-cicd-pipeline-oidc/VERIFICATION.md) for the Phase 4 verification template.
 
-Key checks DevOps runs after applying `ci/` and merging the workflow:
+Key checks DevOps runs after applying `platform/oidc/` and merging the workflow:
 
 1. **PR trigger:** open a no-op PR to main. Confirm `plan` job runs, posts a comment, and `apply-*` jobs do NOT run.
 2. **Push trigger to staging:** merge a staging-only change. Confirm `apply-staging` runs auto, `apply-prod` is skipped via filter.
@@ -199,7 +190,6 @@ Key checks DevOps runs after applying `ci/` and merging the workflow:
 
 ## Future improvements (v2 tracked)
 
-- Move the OIDC identity provider from `live/dmair/staging/backend/oidc.tf` to `ci/main.tf` via `terraform state mv`. Decouples account-wide trust from the staging backend stack lifecycle.
 - Tag every prod resource with `Environment=prod` so `dmair-terraform-prod-apply` can tighten its scope from name-prefix lists to a single tag condition.
 - Add a `staging` GitHub Environment with environment-scoped secrets if the backend secrets need separate rotation cadence from the rest of the repo.
 - Add `checkov` or `tfsec` static security scan as a non-blocking advisory job in the plan workflow.

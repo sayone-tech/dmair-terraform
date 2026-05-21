@@ -1,13 +1,13 @@
-# ci/variables.tf — inputs for the terraform CI IAM roles.
+# platform/oidc/variables.tf
 
 variable "aws_region" {
-  description = "AWS region (only us-west-2 is supported)."
+  description = "AWS region."
   type        = string
   default     = "us-west-2"
 }
 
 variable "aws_profile" {
-  description = "Local AWS profile. CI itself doesn't use this — it assumes a role via OIDC."
+  description = "Local AWS profile. CI assumes a role via OIDC and ignores this."
   type        = string
   default     = "dmair"
 }
@@ -31,7 +31,7 @@ variable "github_repo" {
 }
 
 variable "plan_subjects" {
-  description = "OIDC sub-claim patterns allowed to assume the plan-readonly role. Includes all pull-request runs and pushes to main."
+  description = "OIDC sub-claim patterns allowed to assume the plan-readonly role."
   type        = list(string)
   default = [
     "pull_request",
@@ -40,7 +40,7 @@ variable "plan_subjects" {
 }
 
 variable "staging_apply_subjects" {
-  description = "OIDC sub-claim patterns allowed to assume the staging-apply role. Restricted to push to main."
+  description = "OIDC sub-claim patterns allowed to assume the staging-apply role."
   type        = list(string)
   default = [
     "ref:refs/heads/main",
@@ -48,7 +48,7 @@ variable "staging_apply_subjects" {
 }
 
 variable "prod_apply_subjects" {
-  description = "OIDC sub-claim patterns allowed to assume the prod-apply role. Restricted to push to main from the 'prod' environment (GitHub Environments gate)."
+  description = "OIDC sub-claim patterns allowed to assume the prod-apply role (gated by the 'prod' GitHub Environment)."
   type        = list(string)
   default = [
     "environment:prod",
@@ -56,7 +56,7 @@ variable "prod_apply_subjects" {
 }
 
 variable "state_bucket_arn" {
-  description = "ARN of the Terraform state bucket — used in the scoped state-read/write IAM permissions."
+  description = "ARN of the Terraform state bucket — used in the scoped IAM policy templates."
   type        = string
   default     = "arn:aws:s3:::dmair-terraform-prod"
 }
