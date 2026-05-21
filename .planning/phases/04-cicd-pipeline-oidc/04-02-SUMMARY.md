@@ -14,56 +14,59 @@ status: code-only-complete
 
 `.github/workflows/terraform.yml`
 
-## Job graph
+## Job graph (post DevOps review)
 
 ```
-                       on: pull_request OR push to main
-                                 │
-                                 ▼
-                       ┌───────────────────┐
-                       │  detect-changes   │
-                       │  (paths matrix)   │
-                       └─────────┬─────────┘
-                                 │
-              ┌──────────────────┴──────────────────┐
-              ▼                                     ▼
-       ┌────────────┐                          (no-op if no changes)
-       │   plan     │  matrix per stack
-       │            │  - terraform fmt/validate/plan
-       │            │  - PR: post plan as PR comment
-       │            │  - push: upload tfplan artifact
-       └─────┬──────┘
-             │ (push to main only)
-             ▼
-    ┌────────┴───────────────┐
-    ▼                        ▼
-┌────────────────┐    ┌──────────────────┐
-│ apply-staging  │    │  apply-prod      │
-│ live/dmair/    │    │  bootstrap | ci |│
-│ staging/* only │    │  live/dmair/     │
-│                │    │  prod/*          │
-│ Auto-applies   │    │                  │
-│ (no reviewer)  │    │ environment: prod│
-│                │    │ Required-reviewer│
-│ Role: staging- │    │ gate. Role: prod-│
-│ apply          │    │ apply            │
-└────────────────┘    └──────────────────┘
+   pull_request OR push to main           workflow_dispatch
+        (auto)                              (manual operator)
+            │                                       │
+            ▼                                       │
+  ┌───────────────────┐                             │
+  │  detect-changes   │                             │
+  └─────────┬─────────┘                             │
+            │                                       │
+            ▼                                       │
+  ┌────────────────────┐                            │
+  │   plan (matrix)    │                            │
+  │  fmt/validate/plan │                            │
+  │  PR: comment       │                            │
+  │  push: artifact    │                            │
+  └────────────────────┘                            │
+                                                    │
+                       ┌────────────────────────────┴────────┐
+                       ▼                                     ▼
+                ┌────────────────┐                  ┌────────────────────┐
+                │ apply-staging  │                  │  apply-prod        │
+                │ live/dmair/    │                  │  bootstrap | ci |  │
+                │ staging/* only │                  │  live/dmair/prod/* │
+                │ no env gate    │                  │  environment: prod │
+                │ Role: staging- │                  │  Required reviewer │
+                │ apply          │                  │  Role: prod-apply  │
+                └────────────────┘                  └────────────────────┘
 ```
+
+**Apply is no longer triggered by `push: main`.** Per DevOps review, apply runs only on `workflow_dispatch` — the operator picks a single stack from a dropdown and runs the workflow manually.
 
 ## Stack-routing logic
 
 `detect-changes` outputs the list of changed stacks based on `git diff`. Special-case: any change under `modules/` or `policies/` fans out to **every** stack (any resource in the graph could be affected). The two apply jobs filter the matrix to their respective stack subsets.
 
-## Sensitive vars
+## Secrets used by the workflow
 
-The staging-backend stack's four sensitive vars (`db_password`, `jwt_secret_key`, `mail_password`, `admin_bootstrap_password`) are injected as `TF_VAR_*` env vars from repo Secrets:
+**Role ARNs (kept out of YAML per DevOps review):**
+
+- `AWS_PLAN_ROLE_ARN`
+- `AWS_STAGING_APPLY_ROLE_ARN`
+- `AWS_PROD_APPLY_ROLE_ARN`
+
+**Application sensitive vars (staging-backend stack only):**
 
 - `STAGING_BACKEND_DB_PASSWORD`
 - `STAGING_BACKEND_JWT_SECRET`
 - `STAGING_BACKEND_MAIL_PASSWORD`
 - `STAGING_BACKEND_ADMIN_PASSWORD`
 
-These are loaded on both plan and apply jobs (plan needs them too — terraform refuses to plan without all required vars defined).
+The four app secrets are loaded on both plan and apply jobs (plan needs them too — terraform refuses to plan without all required vars defined).
 
 ## Why no `checkov` / `tfsec` job
 

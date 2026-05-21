@@ -145,9 +145,21 @@ The current `dmair-terraform-staging-apply` role does not require a GitHub Envir
 
 Configured under repo Settings → Secrets and variables → Actions → Repository secrets:
 
+### Role ARNs (DevOps-review feedback — kept out of workflow YAML)
+
 | Secret | Used by | Purpose |
 |---|---|---|
-| `STAGING_BACKEND_DB_PASSWORD` | `plan` + `apply-staging` jobs (only when staging-backend stack changes) | RDS master/app password |
+| `AWS_PLAN_ROLE_ARN` | `plan` job | ARN of `dmair-terraform-plan-readonly` |
+| `AWS_STAGING_APPLY_ROLE_ARN` | `apply-staging` job | ARN of `dmair-terraform-staging-apply` |
+| `AWS_PROD_APPLY_ROLE_ARN` | `apply-prod` job | ARN of `dmair-terraform-prod-apply` |
+
+> ARNs aren't credentials, but keeping them out of source removes account-id surface area for casual recon and provides a clean indirection point for future rotations or multi-account splits.
+
+### Application-level sensitive vars
+
+| Secret | Used by | Purpose |
+|---|---|---|
+| `STAGING_BACKEND_DB_PASSWORD` | `plan` + `apply-staging` (only when staging-backend stack changes) | RDS master/app password |
 | `STAGING_BACKEND_JWT_SECRET` | same | HS512 signing key for the backend app |
 | `STAGING_BACKEND_MAIL_PASSWORD` | same | SendGrid API key |
 | `STAGING_BACKEND_ADMIN_PASSWORD` | same | Initial admin bootstrap password |

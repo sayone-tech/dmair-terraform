@@ -46,7 +46,17 @@ Without this Environment, the `apply-prod` workflow job has nothing to gate on �
 
 ### Step 3 — Add repository Secrets
 
-Repo Settings → Secrets and variables → Actions → Repository secrets:
+Repo Settings → Secrets and variables → Actions → Repository secrets. Seven secrets total:
+
+**Role ARNs (3) — from `cd ci && terraform output` in Step 1:**
+
+| Secret | Source | Used by |
+|---|---|---|
+| `AWS_PLAN_ROLE_ARN` | `terraform output plan_readonly_role_arn` | plan job |
+| `AWS_STAGING_APPLY_ROLE_ARN` | `terraform output staging_apply_role_arn` | apply-staging job |
+| `AWS_PROD_APPLY_ROLE_ARN` | `terraform output prod_apply_role_arn` | apply-prod job |
+
+**Application sensitive vars (4) — same values used in Phase 3 `staging.auto.tfvars`:**
 
 | Secret | Source | Used by |
 |---|---|---|
@@ -55,7 +65,7 @@ Repo Settings → Secrets and variables → Actions → Repository secrets:
 | `STAGING_BACKEND_MAIL_PASSWORD` | same | plan + apply-staging |
 | `STAGING_BACKEND_ADMIN_PASSWORD` | same | plan + apply-staging |
 
-These map to `TF_VAR_*` in the workflow; without them, terraform plan against `live/dmair/staging/backend/` will fail with `Error: No value for required variable`.
+Without the role ARNs, the workflow's `configure-aws-credentials` step fails. Without the four app secrets, `terraform plan` against the staging-backend stack fails with `Error: No value for required variable`.
 
 ### Step 4 — Enable branch protection on `main`
 
@@ -77,20 +87,31 @@ Open a no-op PR touching a single stack (e.g., add a comment line to `live/dmair
 
 Close the PR without merging.
 
-### Step 6 — Smoke test — push to staging
+### Step 6 — Smoke test — manual apply (staging)
 
 Merge a staging-only PR (e.g., touching `live/dmair/staging/frontend/main.tf`).
 
-- `apply-staging` runs to completion, with NO reviewer prompt.
-- `apply-prod` runs but its filter short-circuits all subsequent steps.
+- The post-merge `plan` job runs against `main` and uploads the plan artifact for review.
+- Apply does NOT auto-run.
 
-### Step 7 — Smoke test — push to prod (the load-bearing test)
+Now manually dispatch the apply:
+
+- Actions → `terraform` workflow → **Run workflow** → pick the staging stack → Run.
+- `apply-staging` runs to completion, with NO reviewer prompt.
+
+### Step 7 — Smoke test — manual apply (prod, the load-bearing test)
 
 Merge a prod-affecting PR (e.g., touching `live/dmair/prod/strapi/output.tf`).
 
+- Post-merge `plan` job runs and uploads the plan artifact.
+- Apply does NOT auto-run.
+
+Dispatch:
+
+- Actions → `terraform` → **Run workflow** → pick `live/dmair/prod/strapi` → Run.
 - `apply-prod` pauses on the `prod` Environment. Actions UI shows "Review pending deployment".
 - A listed reviewer clicks **Approve and deploy**.
-- `apply-prod` resumes, assumes the `dmair-terraform-prod-apply` role, runs `terraform apply`, exits clean.
+- `apply-prod` resumes, assumes the `dmair-terraform-prod-apply` role, runs `terraform plan` + `apply`, exits clean.
 
 ### Step 8 — Smoke test — no-escalation invariant
 
@@ -104,7 +125,7 @@ resource "aws_iam_role" "escalation_probe" {
 }
 ```
 
-Plan succeeds. Merge to main → `apply-prod` (after reviewer approval) fails with `AccessDenied: iam:CreateRole` because `not-in-scope-*` doesn't match any prefix in `dmair-terraform-prod-apply`'s policy.
+Plan succeeds. Merge to main, then **manually dispatch** `apply-prod` against `live/dmair/prod/strapi` (so reviewer approves, role assumes, then terraform tries to create the role). Expected: `AccessDenied: iam:CreateRole` because `not-in-scope-*` doesn't match any prefix in `dmair-terraform-prod-apply`'s policy.
 
 Revert the probe commit. The failure log is the evidence — paste it into VERIFICATION.md.
 

@@ -48,6 +48,9 @@ Settings → Secrets and variables → Actions → Repository secrets:
 
 | Secret | Set |
 |---|---|
+| `AWS_PLAN_ROLE_ARN` | _( yes / no )_ |
+| `AWS_STAGING_APPLY_ROLE_ARN` | _( yes / no )_ |
+| `AWS_PROD_APPLY_ROLE_ARN` | _( yes / no )_ |
 | `STAGING_BACKEND_DB_PASSWORD` | _( yes / no )_ |
 | `STAGING_BACKEND_JWT_SECRET` | _( yes / no )_ |
 | `STAGING_BACKEND_MAIL_PASSWORD` | _( yes / no )_ |
@@ -78,19 +81,24 @@ If the merge button isn't blocked: go to Settings → Branches → Branch protec
 
 ---
 
-## CICD-01 #2 + CICD-02 #1 — Push to main → staging auto-applies + prod gated
+## CICD-01 #2 + CICD-02 #1 — Manual dispatch → staging applies + prod gated
 
 Merge a staging-only change (e.g., touch `live/dmair/staging/frontend/main.tf` or `live/dmair/staging/backend/cloudwatch.tf`). Confirm:
 
-- `detect-changes` → `plan` → `apply-staging` runs end-to-end without any reviewer interaction.
-- `apply-prod` runs (because of the matrix) but its filter step short-circuits all subsequent steps (no work done).
+- Post-merge `plan` job runs and uploads the plan artifact.
+- **Apply does NOT auto-run.**
+- Actions → `terraform` workflow → **Run workflow** → pick the staging stack → Run.
+- `apply-staging` runs end-to-end without any reviewer interaction.
 
 ```text
-TODO_DEVOPS: paste workflow run link. Confirm apply-staging applied; apply-prod was a no-op via filter.
+TODO_DEVOPS: paste two workflow run links — the post-merge plan run + the manually-dispatched apply run.
 ```
 
 Now merge a prod-affecting change (e.g., touch `bootstrap/main.tf` or `live/dmair/prod/frontend/main.tf`). Confirm:
 
+- Post-merge `plan` job runs.
+- Apply does NOT auto-run.
+- Manually dispatch the apply for the prod stack.
 - `apply-prod` pauses on the `prod` Environment gate. The Actions run shows a "Review pending deployment" prompt.
 - An approved reviewer clicks "Approve and deploy". The job resumes.
 - `apply-prod` succeeds with the prod-apply role assumed.
@@ -106,7 +114,7 @@ TODO_DEVOPS: paste workflow run link showing the reviewer-gate prompt + post-app
 Attempt to add an IAM role that escapes the scoped name prefixes — e.g., a role named `not-in-scope-attacker-role` in `live/dmair/prod/strapi/main.tf`. Push to a branch, open PR:
 
 - `plan` job should succeed (plan is permissive — it can plan a role create).
-- Merge to main → `apply-prod` is invoked with reviewer approval. After approval, the apply should FAIL with an `AccessDenied` on `iam:CreateRole` because the role name doesn't match the prefix list in `dmair-terraform-prod-apply`'s policy.
+- Merge to main → manually dispatch `apply-prod` against `live/dmair/prod/strapi`. Reviewer approves. The apply should then FAIL with an `AccessDenied` on `iam:CreateRole` because the role name doesn't match the prefix list in `dmair-terraform-prod-apply`'s policy.
 
 Revert the test change after the failure.
 
