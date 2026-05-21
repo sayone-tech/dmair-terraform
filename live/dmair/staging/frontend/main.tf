@@ -1,5 +1,5 @@
 module "S3_Website" {
-  source = "../../../modules/s3"
+  source = "../../../../modules/s3"
   #Env variables
   APP_NAME                       = var.APP_NAME
   ENV                            = var.ENV
@@ -28,7 +28,7 @@ module "S3_Website" {
 # Must be defined BEFORE cloudfront module to avoid dependency issues
 module "cloudfront_basic_auth" {
   count  = var.enable_basic_auth ? 1 : 0
-  source = "../../../modules/cloudfront-function"
+  source = "../../../../modules/cloudfront-function"
 
   app_name      = var.APP_NAME
   env           = var.ENV
@@ -41,7 +41,7 @@ module "cloudfront_basic_auth" {
 }
 
 module "cloudfront" {
-  source = "../../../modules/cloudfront"
+  source = "../../../../modules/cloudfront"
 
   #variables from s3
   s3_domain          = module.S3_Website.S3-Bucket-Domain
@@ -66,14 +66,14 @@ module "cloudfront" {
 }
 
 module "secrets_manager" {
-  source   = "../../../modules/secrets_manager"
+  source   = "../../../../modules/secrets_manager"
   App_Name = var.APP_NAME
   Env_Type = var.ENV
 }
 
 # GitHub Actions IAM user using template-based policies
 module "github_actions_policies" {
-  source      = "../../../modules/iam-policy"
+  source      = "../../../../modules/iam-policy"
   name_prefix = lower("${var.APP_NAME}-${var.ENV}-github-actions")
   policy_templates = [
     "s3_rw",
@@ -96,7 +96,7 @@ module "github_actions_policies" {
 
 
 module "github_actions_user" {
-  source    = "../../../modules/iam-user"
+  source    = "../../../../modules/iam-user"
   user_name = lower("${var.APP_NAME}-${var.ENV}-github-actions-user")
   app_name  = var.APP_NAME
   env       = var.ENV
@@ -108,7 +108,7 @@ module "github_actions_user" {
 }
 
 module "S3_Website_dist" {
-  source                         = "../../../modules/s3"
+  source                         = "../../../../modules/s3"
   APP_NAME                       = "${var.APP_NAME}-dist"
   ENV                            = var.ENV
   tags                           = var.tags
@@ -131,7 +131,7 @@ module "S3_Website_dist" {
 }
 
 module "cloudfront_dist" {
-  source = "../../../modules/cloudfront"
+  source = "../../../../modules/cloudfront"
 
   s3_domain                 = module.S3_Website_dist.S3-Bucket-Domain
   s3_regional_domain        = module.S3_Website_dist.S3-Bucket-Domain
