@@ -16,11 +16,6 @@ dmair-terraform/
 │                                       # Adopts pre-existing dmair-terraform-prod.
 │                                       # State key: bootstrap/terraform.tfstate
 │
-├── platform/                           # Account-wide foundational resources.
-│   └── oidc/                           # GitHub Actions OIDC IDP + dmair-terraform CI
-│                                       # roles (plan-readonly, staging-apply, prod-apply).
-│                                       # State key: platform/oidc/terraform.tfstate
-│
 ├── live/dmair/                         # Project-keyed live workloads.
 │   │                                   # Layout: live/<project>/<component>/<env>/
 │   ├── strapi/
@@ -35,7 +30,6 @@ dmair-terraform/
 │   └── backend/
 │       └── staging/                    # dmair-backend staging slot
 │                                       #   (api-staging.flydmair.com).
-│                                       # Hosts dmair-backend-staging-deploy OIDC role.
 │                                       # State key: staging/backend/terraform.tfstate
 │
 ├── modules/                            # Reusable local Terraform modules.
@@ -58,11 +52,13 @@ dmair-terraform/
 │   ├── secrets_manager_read.tpl
 │   ├── sg_manage.tpl
 │   ├── ses_send_mail.tpl
-│   ├── ec2_app_runtime.tpl             #   EC2 instance role (Phase 3)
-│   ├── github_app_deploy.tpl           #   dmair-backend-staging-deploy role
-│   ├── tf_plan_readonly.tpl            #   Terraform CI plan role
-│   ├── tf_staging_apply.tpl            #   Terraform CI staging-apply role
-│   └── tf_prod_apply.tpl               #   Terraform CI prod-apply role
+│   └── ec2_app_runtime.tpl             #   EC2 instance role (Phase 3)
+│
+├── docs/
+│   └── iam-oidc/                       # IAM role JSON templates for the
+│                                       # GitHub Actions OIDC roles. Ops creates
+│                                       # the roles out-of-band — NOT managed by
+│                                       # Terraform. See docs/iam-oidc/README.md.
 │
 └── .planning/                          # GSD workflow artifacts (ROADMAP, phases, state).
 ```
@@ -74,7 +70,6 @@ Every workspace stores Terraform state in a single S3 bucket (`dmair-terraform-p
 | Workspace | State key |
 |---|---|
 | `bootstrap/`                     | `bootstrap/terraform.tfstate` |
-| `platform/oidc/`                 | `platform/oidc/terraform.tfstate` |
 | `live/dmair/strapi/prod/`        | `strapi/terraform.tfstate` |
 | `live/dmair/frontend/prod/`      | `frontend/prod/terraform.tfstate` |
 | `live/dmair/frontend/staging/`   | `frontend/staging/terraform.tfstate` |
@@ -183,11 +178,11 @@ This repo is mid-migration as of 2026-05. See [`.planning/ROADMAP.md`](.planning
 
 1. **Phase 1 — Bootstrap State Backend** (in DevOps review): `bootstrap/` stack adopts `dmair-terraform-prod` via import, every live backend rewires to `use_lockfile = true`, two-terminal lock contention proves the lock works.
 2. **Phase 2 — Refactor to `live/` Layout** (in DevOps review): `envs/` → `live/dmair/<component>/<env>/`, README rewrite, staging slot reserved.
-3. **Phase 3 — dmair-backend Staging Slot:** `live/dmair/backend/staging/` (VPC, EC2 + EIP, RDS PostGIS, ECR, Secrets, OIDC role) deployable at `api-staging.flydmair.com`.
-4. **Phase 4 — CI/CD Pipeline + OIDC:** PR-gated plans + merge-gated applies via GitHub Environments; OIDC trust + role inventory documented in `OIDC.md`.
+3. **Phase 3 — dmair-backend Staging Slot:** `live/dmair/backend/staging/` (VPC, EC2 + EIP, RDS PostGIS, ECR, Secrets) deployable at `api-staging.flydmair.com`. The `dmair-backend-staging-deploy` OIDC role is created out-of-band by ops — see [`docs/iam-oidc/`](docs/iam-oidc/).
+4. **Phase 4 — CI/CD Pipeline + OIDC:** PR-gated plans + manual `workflow_dispatch` applies, with GitHub Environments + required reviewers for prod. OIDC trust + role inventory + JSON templates in [`docs/iam-oidc/`](docs/iam-oidc/).
 
 ## Cross-repo
 
 This repo is consumed by [`dmair-backend`](https://github.com/<org>/dmair-backend) via two contracts that are expensive to rename after they land:
 - DNS: `api-staging.flydmair.com` (created Phase 3).
-- OIDC role ARN: name finalized in Phase 3, documented in `OIDC.md` (Phase 4).
+- OIDC role ARN: name finalized in Phase 3, documented in [`docs/iam-oidc/README.md`](docs/iam-oidc/README.md) (Phase 4).

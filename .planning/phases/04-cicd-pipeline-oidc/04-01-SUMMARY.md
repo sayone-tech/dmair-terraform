@@ -4,40 +4,36 @@ plan: 01
 status: code-only-complete
 ---
 
-# Plan 04-01 Summary — platform/oidc/ stack (three OIDC-trusted IAM roles)
+# Plan 04-01 Summary — IAM Roles for GitHub Actions OIDC (manual ops setup)
 
 ## Status
 
-**code-only-complete.** New `platform/oidc/` Terraform stack with three IAM roles. `terraform init` / `apply` deferred to DevOps.
+**code-only-complete.** Per DevOps PR feedback, the four OIDC-trusted IAM roles + the GitHub Actions OIDC identity provider are **not** managed by Terraform. They are created out-of-band by ops following the procedure in [`docs/iam-oidc/README.md`](../../../docs/iam-oidc/README.md). This plan ships the JSON templates with placeholders + the README walking through the setup.
 
-## Files (commit fdb83b6 _(approx)_)
+## What landed
 
 | File | Purpose |
 |---|---|
-| `platform/oidc/backend.tf` | S3 backend at key `platform/oidc/terraform.tfstate` with `use_lockfile = true`. |
-| `platform/oidc/providers.tf` | Terraform `~> 1.15`; aws `5.91.0`; default_tags `{Project=dmair, Component=ci, ManagedBy=terraform}`. |
-| `platform/oidc/variables.tf` | OIDC sub-claim patterns per role + state bucket ARN. |
-| `platform/oidc/main.tf` | GitHub OIDC IDP + three terraform CI roles (plan-readonly, staging-apply, prod-apply) composed via `modules/iam-policy` (renders `policies/tf_*.tpl`) + `modules/iam-role`. |
-| `platform/oidc/outputs.tf` | IDP ARN + three role ARNs. |
+| `docs/iam-oidc/README.md` | Setup walkthrough: create the OIDC IDP once, render templates with `ACCOUNT_ID` / `ORG/REPO` placeholders, run the `aws iam create-role` + `put-role-policy` sequence, add repo Secrets, configure the `prod` GitHub Environment, enable branch protection on `main`. |
+| `dmair-terraform-plan-readonly-trust.json` + `-permissions.json` | Plan-readonly role: PR + push-to-main trust; refresh-only `Describe/Get/List` perms + state-bucket read + `.tflock` RW. |
+| `dmair-terraform-staging-apply-trust.json` + `-permissions.json` | Staging-apply role: trust restricted to `ref:refs/heads/main`; scoped staging writes (tag `Environment=staging` OR name prefix `dmair-staging-*` / `dmair-backend-staging-*` only). |
+| `dmair-terraform-prod-apply-trust.json` + `-permissions.json` | Prod-apply role: trust restricted to `environment:prod` (so the role can only be assumed once the GitHub Environment reviewer-gate has fired); broader prod-prefix scope. |
+| `dmair-backend-staging-deploy-trust.json` + `-permissions.json` | Cross-repo role assumed by the dmair-backend repo's CI; ECR push/pull + Secrets read + SSM SendCommand/StartSession on the staging EC2 only. |
 
-`terraform fmt -check` clean.
+All JSON contains placeholders (`ACCOUNT_ID`, `ORG/REPO`, `BACKEND_ORG/BACKEND_REPO`, `STAGING_EC2_INSTANCE_ID`) — safe to commit; ops substitutes real values locally and the rendered output is never committed.
 
-## Permission policies (templated)
+## Why manual (not Terraform-managed)
 
-Three new IAM policy templates land in `policies/`:
+Captured in [`docs/iam-oidc/README.md`](../../../docs/iam-oidc/README.md) §Design notes. Headline: chicken-and-egg (the roles run terraform apply; managing them with Terraform forces a bootstrap-yourself loop), separation of concerns (IAM trust is a security boundary, not app-dev iteration), and faster rotation (`update-assume-role-policy` is one API call).
 
-- `tf_plan_readonly.tpl` — refresh-only `Describe*` / `Get*` / `List*` across the account, state-bucket read, `.tflock` write. **No `secretsmanager:GetSecretValue`**. No mutations.
-- `tf_staging_apply.tpl` — plan-readonly statements + scoped staging writes (RDS / Secrets / ECR / Logs / Budgets on `dmair-staging-*` name prefix; EC2/VPC conditional on `aws:RequestTag/Environment=staging`; IAM mutate only on `dmair-staging-*` / `dmair-backend-staging-*` prefixes).
-- `tf_prod_apply.tpl` — plan-readonly statements + broader prod-prefix scope (`strapi-*`, `frontend-*`, `dmair-prod-*`, `cms-*`, `github-actions-*`). Required-reviewer Environment gate is the primary safety control.
+## What was deleted from earlier commits
 
-Templates are rendered into managed `aws_iam_policy` resources by `modules/iam-policy`; each role attaches the corresponding policy ARN via `modules/iam-role`. This matches the existing Strapi / Frontend pattern.
+- `platform/oidc/` Terraform stack (5 files) — superseded by the docs/iam-oidc/ JSON templates.
+- `policies/tf_plan_readonly.tpl`, `policies/tf_staging_apply.tpl`, `policies/tf_prod_apply.tpl`, `policies/github_app_deploy.tpl` — orphaned since platform/oidc/ was their only consumer.
+- `live/dmair/backend/staging/oidc.tf` — the `dmair-backend-staging-deploy` role is also ops-managed now. The data lookup on the OIDC IDP is gone too (nothing in the stack uses it).
+- `OIDC.md` at repo root — content folded into `docs/iam-oidc/README.md`.
 
-## Roles
+## What stays Terraform-managed
 
-1. **dmair-terraform-plan-readonly** — assumed on PRs + push-to-main.
-2. **dmair-terraform-staging-apply** — assumed on workflow_dispatch from `main`. IAM `Create*` blocked outside the staging prefixes (CICD-01 #3 no-escalation invariant).
-3. **dmair-terraform-prod-apply** — assumed only with OIDC sub `environment:prod`. The `prod` GitHub Environment with required reviewers is the load-bearing safety control.
-
-## OIDC identity provider
-
-The account-wide `aws_iam_openid_connect_provider.github` is created in this stack (`platform/oidc/main.tf`). Sibling stacks (`live/dmair/backend/staging/oidc.tf` — the `dmair-backend-staging-deploy` role) reference it via `data "aws_iam_openid_connect_provider"`. Apply `platform/oidc/` BEFORE any stack that defines OIDC-trusted roles.
+- `policies/ec2_app_runtime.tpl` — used by the EC2 instance role in `live/dmair/backend/staging/iam.tf`. That role is a normal IAM service role for EC2 (`Principal: ec2.amazonaws.com`), not an OIDC federated role, so Terraform management remains appropriate.
+- `modules/iam-policy`, `modules/iam-role` — still used by the live stacks.

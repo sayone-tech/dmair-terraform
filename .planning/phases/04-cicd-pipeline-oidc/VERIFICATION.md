@@ -8,30 +8,23 @@
 
 ---
 
-## Pre-verification — Apply `platform/oidc/`
+## Pre-verification — Create the OIDC IDP + 4 IAM roles
 
-The CI roles must exist before the workflow can assume them. This is a one-time bootstrap step run by an operator with full IAM perms (not via the workflow itself — circular dependency otherwise).
+Follow [`docs/iam-oidc/README.md`](../../../docs/iam-oidc/README.md) end-to-end. After Step 2 of that doc, you should be able to:
 
 ```sh
-cd platform/oidc
-terraform init
-terraform plan        # expect ~5 resources to add (3 roles, 3 inline policies)
-terraform apply       # answer yes
-terraform output
+aws iam list-open-id-connect-providers --query "OpenIDConnectProviderList[?contains(Arn, 'token.actions.githubusercontent.com')]"
+
+for role in dmair-terraform-plan-readonly \
+            dmair-terraform-staging-apply \
+            dmair-terraform-prod-apply \
+            dmair-backend-staging-deploy; do
+  aws iam get-role --role-name "$role" --query 'Role.{Name:RoleName,Arn:Arn,Trust:AssumeRolePolicyDocument.Statement[0].Condition}' --output table
+done
 ```
 
 ```text
-TODO_DEVOPS: paste `terraform output` showing the three role ARNs + the OIDC provider ARN.
-```
-
-Copy each `terraform output` value into a repo Secret (Step 3 below). The workflow no longer hardcodes ARNs — secret names map 1:1:
-
-- `terraform output plan_readonly_role_arn` → repo Secret `AWS_PLAN_ROLE_ARN`
-- `terraform output staging_apply_role_arn` → repo Secret `AWS_STAGING_APPLY_ROLE_ARN`
-- `terraform output prod_apply_role_arn` → repo Secret `AWS_PROD_APPLY_ROLE_ARN`
-
-```text
-TODO_DEVOPS: confirm three Secrets are populated with the matching role ARNs.
+TODO_DEVOPS: paste the OIDC IDP ARN + the 4 role ARNs.
 ```
 
 ---
@@ -55,15 +48,15 @@ Settings → Secrets and variables → Actions → Repository secrets:
 | `STAGING_BACKEND_ADMIN_PASSWORD` | _( yes / no )_ |
 
 ```text
-TODO_DEVOPS: tick all four. Confirm `prod` Environment exists with reviewers.
+TODO_DEVOPS: confirm all seven Secrets are set and the `prod` Environment exists with reviewers.
 ```
 
 ---
 
 ## CICD-01 #1 — PR triggers `plan` + comment + merge gate
 
-1. Open a no-op PR touching one stack (e.g., a comment in `live/dmair/strapi/prod/main.tf`).
-2. Watch the workflow run. The `detect-changes` + `plan` jobs run; the two `apply-*` jobs are skipped (because `github.event_name == 'pull_request'`).
+1. Open a no-op PR touching one stack.
+2. The `detect-changes` + `plan` jobs run; the two `apply-*` jobs are skipped (because `github.event_name == 'pull_request'`).
 3. The `plan` job posts a comment on the PR.
 4. The PR's "merge" button is disabled because `terraform / plan` is a required status check.
 
@@ -74,8 +67,6 @@ TODO_DEVOPS: paste link to the PR (or screenshot the workflow + PR comment). Con
   - PR comment posted with `terraform plan` output
   - merge button blocked
 ```
-
-If the merge button isn't blocked: go to Settings → Branches → Branch protection rules → `main` → tick `Require status checks to pass before merging` and select the `terraform / plan` checks. This is a one-time GitHub-UI step; not codified in Terraform.
 
 ---
 
@@ -120,20 +111,20 @@ Revert the test change after the failure.
 TODO_DEVOPS: paste the AccessDenied error from the failing apply. This is the no-escalation evidence.
 ```
 
-(Alternative test: try to add a role under the staging-apply role's scope but with a name outside its prefix. Same expected failure.)
-
 ---
 
-## CICD-02 #4 — OIDC.md complete
+## CICD-02 #4 — `docs/iam-oidc/README.md` complete
 
-Spot-check that [`OIDC.md`](../../../OIDC.md) at repo root contains:
+Spot-check that [`docs/iam-oidc/README.md`](../../../docs/iam-oidc/README.md) contains:
 
-- [ ] OIDC trust provider details (URL, audience, thumbprint, where it's defined)
-- [ ] All four OIDC-trusted role inventories (plan-readonly, staging-apply, prod-apply, dmair-backend-staging-deploy) with sub-claim trust, scope, and where each is defined
-- [ ] GitHub Environments configuration guide (`prod` + optional `staging`)
-- [ ] Repository Secrets table
-- [ ] Trust subject claim reference table
-- [ ] Future-improvements section
+- [ ] OIDC trust provider setup command (URL, audience, thumbprint)
+- [ ] All four roles enumerated (plan-readonly, staging-apply, prod-apply, dmair-backend-staging-deploy) with file references
+- [ ] Setup procedure: render templates locally, create roles + inline policies, never commit rendered files
+- [ ] GitHub Secrets table
+- [ ] `prod` Environment configuration guide
+- [ ] Branch protection guide
+- [ ] Rotation + rollback procedures
+- [ ] Design notes (why per-role trust, why inline policies, why manual)
 
 ```text
 TODO_DEVOPS: tick each box or note specific gaps.
@@ -143,7 +134,7 @@ TODO_DEVOPS: tick each box or note specific gaps.
 
 ## Phase Exit
 
-- [ ] **CICD-01** — PR triggers plan + PR comment + merge-gate; staging auto-applies; prod gated by `prod` Environment with reviewers
-- [ ] **CICD-02** — All four OIDC roles enumerated in OIDC.md; no-escalation invariant enforced (apply fails for IAM names outside the role's prefix list)
+- [ ] **CICD-01** — PR triggers plan + PR comment + merge-gate; staging applies on manual dispatch; prod gated by `prod` Environment with reviewers
+- [ ] **CICD-02** — All four OIDC roles enumerated in `docs/iam-oidc/`; no-escalation invariant enforced (apply fails for IAM names outside the role's prefix list)
 
 Set Outcome above. Commit with `docs(CICD-02): record CI/CD pipeline verification evidence`. Then `/gsd-transition` to mark the milestone complete.

@@ -6,15 +6,15 @@
       "Effect": "Allow",
       "Action": ["s3:GetObject", "s3:ListBucket"],
       "Resource": [
-        "${state_bucket_arn}",
-        "${state_bucket_arn}/*"
+        "arn:aws:s3:::dmair-terraform-prod",
+        "arn:aws:s3:::dmair-terraform-prod/*"
       ]
     },
     {
       "Sid": "StateLockfileRw",
       "Effect": "Allow",
       "Action": ["s3:PutObject", "s3:DeleteObject"],
-      "Resource": "${state_bucket_arn}/*.tflock"
+      "Resource": "arn:aws:s3:::dmair-terraform-prod/*.tflock"
     },
     {
       "Sid": "DescribeAllForRefresh",

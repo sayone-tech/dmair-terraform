@@ -13,7 +13,7 @@
 1. **Phase 1 + Phase 2 applied.** All four existing stacks (`bootstrap`, `live/dmair/strapi/prod`, `live/dmair/frontend/prod`, `live/dmair/frontend/staging`) report `terraform plan` → `No changes`.
 2. **dmair AWS profile** is write-capable with at least:
    - `s3:Get/Put/Delete/ListBucket` on `arn:aws:s3:::dmair-terraform-prod`
-   - `iam:CreateRole`, `iam:AttachRolePolicy`, `iam:CreateInstanceProfile`, etc. for the dmair-backend-staging-deploy role + the EC2 instance role (the OIDC IDP itself is created by `platform/oidc/`, not here)
+   - `iam:CreateRole`, `iam:AttachRolePolicy`, `iam:CreateInstanceProfile` for the **EC2 instance role** (Terraform-managed). The `dmair-backend-staging-deploy` OIDC role + the OIDC IDP itself are created out-of-band by ops per [`docs/iam-oidc/`](../../../docs/iam-oidc/), not by Terraform.
    - `ec2:*`, `vpc:*`, `rds:*`, `ecr:*`, `secretsmanager:*`, `logs:*`, `budgets:*`, `ssm:GetParameter` on the relevant scopes
 3. **The four sensitive vars** are decided and ready:
    - `db_password` — strong, generated.
@@ -67,7 +67,7 @@ You need:
 - `elastic_ip` → DNS A record
 - `ec2_instance_id` → for the SSM session command
 - `ecr_repository_url` → for the dmair-backend CI / first image push
-- `dmair_backend_staging_deploy_role_arn` → for the dmair-backend repo's deploy workflow
+- (the dmair-backend-staging-deploy role ARN comes from the manually-created role per `docs/iam-oidc/` — not output by Terraform)
 - `rds_endpoint` → sanity-check vs application config
 
 ### Step 4 — Point DNS at the EIP (GoDaddy)
@@ -173,7 +173,7 @@ terraform destroy         # answer yes
 git revert <phase-3-shas>
 ```
 
-The OIDC identity provider (`aws_iam_openid_connect_provider.github`) is account-wide and managed by `platform/oidc/` — not by this stack. A Phase 3 destroy removes only the `dmair-backend-staging-deploy` role; the IDP and the terraform CI roles in `platform/oidc/` stay intact.
+The OIDC identity provider + the 4 OIDC-trusted IAM roles are **not** managed by this Terraform stack — they're created out-of-band by ops per [`docs/iam-oidc/`](../../../docs/iam-oidc/). A Phase 3 destroy does NOT touch them.
 
 ---
 

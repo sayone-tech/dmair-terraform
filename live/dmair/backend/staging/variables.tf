@@ -136,25 +136,6 @@ variable "budget_alert_email" {
   default     = "ops@flydmair.com"
 }
 
-# --- CI / OIDC ------------------------------------------------------------
-
-variable "github_org" {
-  description = "GitHub org owning the dmair-backend repository (used in OIDC trust subject claims)."
-  type        = string
-  default     = "sayone-tech"
-}
-
-variable "github_repo" {
-  description = "GitHub repository for the backend application."
-  type        = string
-  default     = "dmair-backend"
-}
-
-variable "github_deploy_branches" {
-  description = "Refs that may assume the dmair-backend-staging-deploy role. Restrict to staging-track refs."
-  type        = list(string)
-  default = [
-    "ref:refs/heads/staging",
-    "environment:staging",
-  ]
-}
+# CI / OIDC variables intentionally removed — the dmair-backend-staging-
+# deploy role is created out-of-band by ops (see docs/iam-oidc/), not by
+# Terraform.

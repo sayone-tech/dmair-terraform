@@ -6,15 +6,15 @@
       "Effect": "Allow",
       "Action": ["s3:GetObject", "s3:ListBucket"],
       "Resource": [
-        "${state_bucket_arn}",
-        "${state_bucket_arn}/*"
+        "arn:aws:s3:::dmair-terraform-prod",
+        "arn:aws:s3:::dmair-terraform-prod/*"
       ]
     },
     {
       "Sid": "StateLockfileRw",
       "Effect": "Allow",
       "Action": ["s3:PutObject", "s3:DeleteObject"],
-      "Resource": "${state_bucket_arn}/*.tflock"
+      "Resource": "arn:aws:s3:::dmair-terraform-prod/*.tflock"
     },
     {
       "Sid": "DescribeAllForRefresh",
@@ -59,7 +59,7 @@
       "Sid": "StateBucketWriteAll",
       "Effect": "Allow",
       "Action": ["s3:PutObject", "s3:DeleteObject"],
-      "Resource": "${state_bucket_arn}/*"
+      "Resource": "arn:aws:s3:::dmair-terraform-prod/*"
     },
     {
       "Sid": "BootstrapBucketManage",
@@ -74,7 +74,7 @@
         "s3:PutBucketVersioning",
         "s3:PutPublicAccessBlock"
       ],
-      "Resource": "${state_bucket_arn}"
+      "Resource": "arn:aws:s3:::dmair-terraform-prod"
     },
     {
       "Sid": "Ec2VpcProdMutate",
@@ -182,33 +182,26 @@
         "iam:UntagUser"
       ],
       "Resource": [
-        "arn:aws:iam::${account_id}:role/strapi-*",
-        "arn:aws:iam::${account_id}:role/frontend-*",
-        "arn:aws:iam::${account_id}:role/dmair-prod-*",
-        "arn:aws:iam::${account_id}:role/cms-*",
-        "arn:aws:iam::${account_id}:instance-profile/strapi-*",
-        "arn:aws:iam::${account_id}:instance-profile/dmair-prod-*",
-        "arn:aws:iam::${account_id}:user/github-actions-*",
-        "arn:aws:iam::${account_id}:user/strapi-*",
-        "arn:aws:iam::${account_id}:user/frontend-*",
-        "arn:aws:iam::${account_id}:policy/strapi-*",
-        "arn:aws:iam::${account_id}:policy/frontend-*",
-        "arn:aws:iam::${account_id}:policy/dmair-prod-*",
-        "arn:aws:iam::${account_id}:policy/cms-*"
+        "arn:aws:iam::ACCOUNT_ID:role/strapi-*",
+        "arn:aws:iam::ACCOUNT_ID:role/frontend-*",
+        "arn:aws:iam::ACCOUNT_ID:role/dmair-prod-*",
+        "arn:aws:iam::ACCOUNT_ID:role/cms-*",
+        "arn:aws:iam::ACCOUNT_ID:instance-profile/strapi-*",
+        "arn:aws:iam::ACCOUNT_ID:instance-profile/dmair-prod-*",
+        "arn:aws:iam::ACCOUNT_ID:user/github-actions-*",
+        "arn:aws:iam::ACCOUNT_ID:user/strapi-*",
+        "arn:aws:iam::ACCOUNT_ID:user/frontend-*",
+        "arn:aws:iam::ACCOUNT_ID:policy/strapi-*",
+        "arn:aws:iam::ACCOUNT_ID:policy/frontend-*",
+        "arn:aws:iam::ACCOUNT_ID:policy/dmair-prod-*",
+        "arn:aws:iam::ACCOUNT_ID:policy/cms-*"
       ]
     },
     {
       "Sid": "EcrProdMutate",
       "Effect": "Allow",
-      "Action": [
-        "ecr:Create*",
-        "ecr:Delete*",
-        "ecr:Put*",
-        "ecr:Set*",
-        "ecr:Tag*",
-        "ecr:Untag*"
-      ],
-      "Resource": "arn:aws:ecr:${aws_region}:${account_id}:repository/*"
+      "Action": ["ecr:Create*", "ecr:Delete*", "ecr:Put*", "ecr:Set*", "ecr:Tag*", "ecr:Untag*"],
+      "Resource": "arn:aws:ecr:us-west-2:ACCOUNT_ID:repository/*"
     },
     {
       "Sid": "LogsProdMutate",

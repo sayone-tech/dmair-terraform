@@ -33,12 +33,7 @@ output "cloudwatch_log_group" {
   value       = aws_cloudwatch_log_group.staging.name
 }
 
-output "dmair_backend_staging_deploy_role_arn" {
-  description = "Cross-repo contract — the dmair-backend CI assumes this role via OIDC. CHANGE WITH CARE."
-  value       = module.dmair_backend_staging_deploy_role.role_arn
-}
-
-output "github_oidc_provider_arn" {
-  description = "Account-wide GitHub Actions OIDC provider ARN (managed in platform/oidc/; data-sourced here)."
-  value       = data.aws_iam_openid_connect_provider.github.arn
-}
+# dmair-backend-staging-deploy role + the GitHub OIDC identity provider
+# are created out-of-band by ops, not by Terraform — see docs/iam-oidc/
+# for the manual setup procedure. The role's ARN is held in the
+# dmair-backend repo's GitHub Secrets, not output here.

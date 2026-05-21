@@ -9,15 +9,14 @@ name: terraform
 #   - workflow_dispatch: manual operator action — picks ONE stack and runs
 #     plan+apply against it. Apply NEVER happens automatically on push.
 #     The 'prod' GitHub Environment with required reviewers gates the apply
-#     for bootstrap/, platform/oidc/, and live/dmair/prod/* stacks.
+#     for bootstrap/ and live/dmair/<component>/prod stacks.
 #
 # IAM role ARNs are held as repo Secrets (not hardcoded in this workflow):
 #   - AWS_PLAN_ROLE_ARN          (dmair-terraform-plan-readonly)
 #   - AWS_STAGING_APPLY_ROLE_ARN (dmair-terraform-staging-apply)
 #   - AWS_PROD_APPLY_ROLE_ARN    (dmair-terraform-prod-apply)
-# The roles + OIDC identity provider live in platform/oidc/.
-#
-# See OIDC.md at repo root for trust policy + scoping rationale.
+# The roles + OIDC identity provider are created out-of-band by ops — not
+# managed by Terraform. See docs/iam-oidc/ for the manual setup procedure.
 
 on:
   pull_request:
@@ -32,7 +31,6 @@ on:
         type: choice
         options:
           - bootstrap
-          - platform/oidc
           - live/dmair/strapi/prod
           - live/dmair/frontend/prod
           - live/dmair/frontend/staging
@@ -92,10 +90,10 @@ jobs:
 
           # If anything under modules/ or policies/ changed, plan every stack.
           if echo "$CHANGED" | grep -E '^(modules|policies)/' >/dev/null; then
-            STACKS='["bootstrap","platform/oidc","live/dmair/strapi/prod","live/dmair/frontend/prod","live/dmair/frontend/staging","live/dmair/backend/staging"]'
+            STACKS='["bootstrap","live/dmair/strapi/prod","live/dmair/frontend/prod","live/dmair/frontend/staging","live/dmair/backend/staging"]'
           else
             STACKS_SET=""
-            for stack in bootstrap platform/oidc live/dmair/strapi/prod live/dmair/frontend/prod live/dmair/frontend/staging live/dmair/backend/staging; do
+            for stack in bootstrap live/dmair/strapi/prod live/dmair/frontend/prod live/dmair/frontend/staging live/dmair/backend/staging; do
               if echo "$CHANGED" | grep -E "^$stack/" >/dev/null; then
                 STACKS_SET="$STACKS_SET \"$stack\","
               fi
@@ -264,7 +262,6 @@ jobs:
     if: |
       github.event_name == 'workflow_dispatch' &&
       (github.event.inputs.stack == 'bootstrap' ||
-       github.event.inputs.stack == 'platform/oidc' ||
        endsWith(github.event.inputs.stack, '/prod'))
     runs-on: ubuntu-latest
     environment: prod
