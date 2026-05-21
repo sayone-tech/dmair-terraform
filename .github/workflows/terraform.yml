@@ -1,0 +1,305 @@
+name: terraform
+
+# PR-gated terraform plan + merge-gated terraform apply for every stack in
+# this repo. Path-filter matrix routes per-stack jobs; the `prod`
+# GitHub Environment with required reviewers gates apply against
+# bootstrap/ + ci/ + live/dmair/prod/*. Staging stacks auto-apply on
+# push-to-main.
+#
+# IAM roles (created in ci/main.tf, Phase 4):
+#   - dmair-terraform-plan-readonly  (assumed on PRs + push-to-main)
+#   - dmair-terraform-staging-apply  (assumed on push-to-main staging jobs)
+#   - dmair-terraform-prod-apply     (assumed in 'prod' Environment only)
+#
+# See OIDC.md at repo root for trust policy + scoping rationale.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read       # checkout
+  id-token: write      # OIDC assume-role
+  pull-requests: write # post plan as PR comment
+
+concurrency:
+  group: terraform-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-west-2
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+  PLAN_ROLE_ARN: arn:aws:iam::071297531943:role/dmair-terraform-plan-readonly
+  STAGING_APPLY_ROLE_ARN: arn:aws:iam::071297531943:role/dmair-terraform-staging-apply
+  PROD_APPLY_ROLE_ARN: arn:aws:iam::071297531943:role/dmair-terraform-prod-apply
+
+jobs:
+  # --------------------------------------------------------------------
+  # detect-changes
+  # Outputs a JSON array of changed stack directories. modules/ and
+  # policies/ changes fan out to every stack (conservative — they could
+  # affect any stack's resource graph).
+  # --------------------------------------------------------------------
+  detect-changes:
+    name: Detect changed stacks
+    runs-on: ubuntu-latest
+    outputs:
+      stacks: ${{ steps.list.outputs.stacks }}
+      has_changes: ${{ steps.list.outputs.has_changes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute changed stacks
+        id: list
+        run: |
+          set -euo pipefail
+          BASE="${{ github.event.pull_request.base.sha }}"
+          if [ -z "$BASE" ]; then
+            # push event — diff against parent
+            BASE="${{ github.event.before }}"
+          fi
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+            BASE=$(git rev-parse HEAD~1)
+          fi
+
+          CHANGED=$(git diff --name-only "$BASE" HEAD)
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          # If anything under modules/ or policies/ changed, plan every stack.
+          if echo "$CHANGED" | grep -E '^(modules|policies)/' >/dev/null; then
+            STACKS='["bootstrap","ci","live/dmair/prod/strapi","live/dmair/prod/frontend","live/dmair/staging/frontend","live/dmair/staging/backend"]'
+          else
+            STACKS_SET=""
+            for stack in bootstrap ci live/dmair/prod/strapi live/dmair/prod/frontend live/dmair/staging/frontend live/dmair/staging/backend; do
+              if echo "$CHANGED" | grep -E "^$stack/" >/dev/null; then
+                STACKS_SET="$STACKS_SET \"$stack\","
+              fi
+            done
+            STACKS_SET="${STACKS_SET%,}"
+            STACKS="[$STACKS_SET]"
+          fi
+
+          echo "stacks=$STACKS"
+          echo "stacks=$STACKS" >> "$GITHUB_OUTPUT"
+          if [ "$STACKS" = "[]" ]; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  # --------------------------------------------------------------------
+  # plan
+  # Runs on PR + push-to-main. Per-stack matrix. Posts plan as PR comment.
+  # --------------------------------------------------------------------
+  plan:
+    name: terraform plan — ${{ matrix.stack }}
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        stack: ${{ fromJson(needs.detect-changes.outputs.stacks) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.3
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials (plan role)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.PLAN_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: terraform init
+        working-directory: ${{ matrix.stack }}
+        run: terraform init -input=false -no-color
+
+      - name: terraform fmt -check
+        working-directory: ${{ matrix.stack }}
+        run: terraform fmt -check -no-color
+
+      - name: terraform validate
+        working-directory: ${{ matrix.stack }}
+        run: terraform validate -no-color
+
+      - name: terraform plan
+        id: plan
+        working-directory: ${{ matrix.stack }}
+        run: |
+          set -o pipefail
+          terraform plan -no-color -input=false -detailed-exitcode -out=tfplan 2>&1 | tee plan.txt
+          # exit code 0 = no changes, 2 = changes present (both are success)
+          ec=${PIPESTATUS[0]}
+          if [ $ec -eq 1 ]; then exit 1; fi
+          echo "exitcode=$ec" >> "$GITHUB_OUTPUT"
+        env:
+          # Sensitive vars for the staging-backend stack (production-grade
+          # values held in the dmair-terraform repo's GitHub Secrets).
+          TF_VAR_db_password: ${{ secrets.STAGING_BACKEND_DB_PASSWORD }}
+          TF_VAR_jwt_secret_key: ${{ secrets.STAGING_BACKEND_JWT_SECRET }}
+          TF_VAR_mail_password: ${{ secrets.STAGING_BACKEND_MAIL_PASSWORD }}
+          TF_VAR_admin_bootstrap_password: ${{ secrets.STAGING_BACKEND_ADMIN_PASSWORD }}
+
+      - name: Save plan artifact (for apply)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ matrix.stack }}
+          path: ${{ matrix.stack }}/tfplan
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Post plan to PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const stack = '${{ matrix.stack }}';
+            let plan = fs.readFileSync(`${stack}/plan.txt`, 'utf8');
+            // Truncate to keep under GitHub's ~65k PR-comment limit.
+            const MAX = 60000;
+            if (plan.length > MAX) {
+              plan = plan.slice(0, MAX) +
+                `\n\n... [truncated ${plan.length - MAX} chars] — see workflow logs for full output ...`;
+            }
+            const body = `### \`terraform plan\` — \`${stack}\`\n\n` +
+                         '<details><summary>Plan output</summary>\n\n```terraform\n' +
+                         plan +
+                         '\n```\n\n</details>';
+            await github.rest.issues.createComment({
+              issue_number: context.payload.pull_request.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body,
+            });
+
+  # --------------------------------------------------------------------
+  # apply-staging
+  # Runs on push to main only. Auto-applies staging stacks. No reviewer
+  # gate (staging is fast-iteration territory). Uses the staging-apply
+  # IAM role.
+  # --------------------------------------------------------------------
+  apply-staging:
+    name: terraform apply (staging) — ${{ matrix.stack }}
+    needs: [detect-changes, plan]
+    if: |
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      needs.detect-changes.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Only staging stacks. The shell-side filter below skips
+        # non-staging stacks for this job.
+        stack: ${{ fromJson(needs.detect-changes.outputs.stacks) }}
+    steps:
+      - name: Filter — staging only
+        id: filter
+        run: |
+          case "${{ matrix.stack }}" in
+            live/dmair/staging/*) echo "is_staging=true" >> "$GITHUB_OUTPUT" ;;
+            *)                    echo "is_staging=false" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - if: steps.filter.outputs.is_staging == 'true'
+        uses: actions/checkout@v4
+
+      - if: steps.filter.outputs.is_staging == 'true'
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.3
+          terraform_wrapper: false
+
+      - if: steps.filter.outputs.is_staging == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-${{ matrix.stack }}
+          path: ${{ matrix.stack }}
+
+      - if: steps.filter.outputs.is_staging == 'true'
+        name: Configure AWS credentials (staging-apply role)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.STAGING_APPLY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - if: steps.filter.outputs.is_staging == 'true'
+        name: terraform init
+        working-directory: ${{ matrix.stack }}
+        run: terraform init -input=false -no-color
+
+      - if: steps.filter.outputs.is_staging == 'true'
+        name: terraform apply
+        working-directory: ${{ matrix.stack }}
+        run: terraform apply -input=false -no-color tfplan
+
+  # --------------------------------------------------------------------
+  # apply-prod
+  # Runs on push to main only. Gated by the 'prod' GitHub Environment
+  # with required reviewers (configured in repo settings → Environments).
+  # Uses the prod-apply IAM role, which is also scoped to assume only
+  # when the OIDC sub claim includes `environment:prod`.
+  # --------------------------------------------------------------------
+  apply-prod:
+    name: terraform apply (prod) — ${{ matrix.stack }}
+    needs: [detect-changes, plan]
+    if: |
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      needs.detect-changes.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    environment: prod
+    strategy:
+      fail-fast: false
+      matrix:
+        stack: ${{ fromJson(needs.detect-changes.outputs.stacks) }}
+    steps:
+      - name: Filter — prod / bootstrap / ci only
+        id: filter
+        run: |
+          case "${{ matrix.stack }}" in
+            bootstrap|ci|live/dmair/prod/*) echo "is_prod=true" >> "$GITHUB_OUTPUT" ;;
+            *)                              echo "is_prod=false" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - if: steps.filter.outputs.is_prod == 'true'
+        uses: actions/checkout@v4
+
+      - if: steps.filter.outputs.is_prod == 'true'
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.3
+          terraform_wrapper: false
+
+      - if: steps.filter.outputs.is_prod == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-${{ matrix.stack }}
+          path: ${{ matrix.stack }}
+
+      - if: steps.filter.outputs.is_prod == 'true'
+        name: Configure AWS credentials (prod-apply role)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.PROD_APPLY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - if: steps.filter.outputs.is_prod == 'true'
+        name: terraform init
+        working-directory: ${{ matrix.stack }}
+        run: terraform init -input=false -no-color
+
+      - if: steps.filter.outputs.is_prod == 'true'
+        name: terraform apply
+        working-directory: ${{ matrix.stack }}
+        run: terraform apply -input=false -no-color tfplan
