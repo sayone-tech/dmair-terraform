@@ -35,6 +35,7 @@
         "iam:List*",
         "cloudfront:Get*",
         "cloudfront:List*",
+        "cloudfront:Describe*",
         "s3:GetBucket*",
         "s3:GetEncryptionConfiguration",
         "s3:GetLifecycleConfiguration",
