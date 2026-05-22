@@ -186,3 +186,7 @@ This repo is mid-migration as of 2026-05. See [`.planning/ROADMAP.md`](.planning
 This repo is consumed by [`dmair-backend`](https://github.com/<org>/dmair-backend) via two contracts that are expensive to rename after they land:
 - DNS: `api-staging.flydmair.com` (created Phase 3).
 - OIDC role ARN: name finalized in Phase 3, documented in [`docs/iam-oidc/README.md`](docs/iam-oidc/README.md) (Phase 4).
+
+## Reference
+
+For a generalized walkthrough of the Terraform + GitHub Actions OIDC pattern used here — including the four-role design, the ten non-obvious gotchas we hit during the smoke test, and a setup checklist for adopting the same pattern in another project — see [`docs/TERRAFORM-OIDC-SETUP.md`](docs/TERRAFORM-OIDC-SETUP.md).
