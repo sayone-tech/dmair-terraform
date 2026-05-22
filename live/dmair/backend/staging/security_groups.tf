@@ -26,7 +26,7 @@ resource "aws_security_group" "ec2" {
   # No SSH ingress — operator access is via SSM Session Manager.
 
   egress {
-    description = "All egress (ECR / Secrets / Logs / RDS / SendGrid / Let's Encrypt / SSM)"
+    description = "All egress (ECR, Secrets, Logs, RDS, SendGrid, ACME, SSM)"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"

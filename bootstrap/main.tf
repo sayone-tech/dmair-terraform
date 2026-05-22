@@ -4,16 +4,17 @@
 # four `import {}` blocks must be removed in a follow-up commit per plan 01-02
 # Task 4 (HashiCorp best practice — RESEARCH §Pitfall 7).
 #
-# Literal values marked TODO_DEVOPS_FROM_SNAPSHOT come from
-# .planning/phases/01-bootstrap-state-backend/01-LIVE-STATE-SNAPSHOT.md
-# §HCL Translation Decisions. Replace before running terraform init/apply.
+# Literal values were captured from live AWS state on 2026-05-22 via the
+# snapshot procedure in .planning/phases/01-bootstrap-state-backend/01-01-DEVOPS-RUNBOOK.md.
+# Source of truth: .planning/phases/01-bootstrap-state-backend/01-LIVE-STATE-SNAPSHOT.md
+# §HCL Translation Decisions.
 
 resource "aws_s3_bucket" "this" {
   bucket = "dmair-terraform-prod"
 
-  # TODO_DEVOPS_FROM_SNAPSHOT: if 01-LIVE-STATE-SNAPSHOT.md capture 4 returned
-  # tags, add tags = { "Key1" = "Val1", ... } below. If NoSuchTagSet, leave
-  # this comment in place and OMIT the tags argument entirely (per Pitfall 8).
+  # Live state has no tags (NoSuchTagSet). `tags` argument intentionally omitted
+  # — declaring it as an empty map would cause terraform to call PutBucketTagging
+  # with an empty TagSet, which is a behavior change vs the current AWS state.
 }
 
 import {
@@ -25,10 +26,10 @@ resource "aws_s3_bucket_versioning" "this" {
   bucket = aws_s3_bucket.this.id
 
   versioning_configuration {
-    # TODO_DEVOPS_FROM_SNAPSHOT: capture 1 .Status — "Enabled" | "Suspended" | "Disabled".
-    # WARNING (Pitfall 3): "Disabled" is irreversible once written to AWS.
-    # Mirror live AWS exactly — do NOT guess.
-    status = "TODO_DEVOPS_FROM_SNAPSHOT"
+    # Live state: GetBucketVersioning returned an empty body — versioning has never
+    # been configured. "Suspended" is the canonical Terraform value that matches
+    # the AWS API's empty-response default and produces a zero-change plan on import.
+    status = "Suspended"
   }
 }
 
@@ -42,12 +43,11 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
 
   rule {
     apply_server_side_encryption_by_default {
-      # TODO_DEVOPS_FROM_SNAPSHOT: capture 2 .Rules[0].ApplyServerSideEncryptionByDefault.SSEAlgorithm
-      # — typically "AES256". If "aws:kms", also add kms_master_key_id = "<arn>" below.
-      sse_algorithm = "TODO_DEVOPS_FROM_SNAPSHOT"
+      # Live state: AES256 (SSE-S3). No KMS key.
+      sse_algorithm = "AES256"
     }
-    # TODO_DEVOPS_FROM_SNAPSHOT: capture 2 .Rules[0].BucketKeyEnabled — if true,
-    # add `bucket_key_enabled = true` on the line above. If false or absent, omit.
+    # Live state: BucketKeyEnabled = true.
+    bucket_key_enabled = true
   }
 }
 
@@ -59,10 +59,8 @@ import {
 resource "aws_s3_bucket_public_access_block" "this" {
   bucket = aws_s3_bucket.this.id
 
-  # TODO_DEVOPS_FROM_SNAPSHOT: capture 3 .PublicAccessBlockConfiguration.* —
-  # the four bools below are AWS-recommended defaults. Mirror live AWS exactly;
-  # if capture 3 returned NoSuchPublicAccessBlockConfiguration, STOP and consult
-  # plan 01-02 Task 2 (deviation requires sign-off per D-03).
+  # Live state: all four block flags = true (the AWS-recommended default for
+  # private buckets — confirmed by GetPublicAccessBlock).
   block_public_acls       = true
   block_public_policy     = true
   ignore_public_acls      = true

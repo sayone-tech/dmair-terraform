@@ -127,7 +127,8 @@ COMPOSE
 
 # Substitute the templatefile() variables (using sed because we used a
 # 'COMPOSE' heredoc above to keep the YAML literal-safe — Terraform's
-# ${} interpolation would otherwise collide with docker compose's $${}).
+# dollar-brace interpolation would otherwise collide with docker
+# compose's double-dollar-brace escape sequences.
 sed -i \
     -e "s|__AWS_REGION__|${aws_region}|g" \
     -e "s|__APP_IMAGE__|${app_image}|g" \
