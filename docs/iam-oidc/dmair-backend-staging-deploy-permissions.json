@@ -1,0 +1,45 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "EcrAuth",
+      "Effect": "Allow",
+      "Action": ["ecr:GetAuthorizationToken"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "EcrPushPull",
+      "Effect": "Allow",
+      "Action": [
+        "ecr:BatchGetImage",
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:PutImage",
+        "ecr:InitiateLayerUpload",
+        "ecr:UploadLayerPart",
+        "ecr:CompleteLayerUpload"
+      ],
+      "Resource": "arn:aws:ecr:us-west-2:ACCOUNT_ID:repository/dmair-backend"
+    },
+    {
+      "Sid": "ReadAppSecret",
+      "Effect": "Allow",
+      "Action": ["secretsmanager:GetSecretValue"],
+      "Resource": "arn:aws:secretsmanager:us-west-2:ACCOUNT_ID:secret:dmair/staging/app-*"
+    },
+    {
+      "Sid": "SsmDeployRollEc2",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:SendCommand",
+        "ssm:StartSession",
+        "ssm:DescribeInstanceInformation",
+        "ssm:GetCommandInvocation"
+      ],
+      "Resource": [
+        "arn:aws:ec2:us-west-2:ACCOUNT_ID:instance/STAGING_EC2_INSTANCE_ID",
+        "arn:aws:ssm:us-west-2::document/AWS-RunShellScript"
+      ]
+    }
+  ]
+}

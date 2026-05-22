@@ -35,3 +35,14 @@ override.tf.json
 # Ignore CLI configuration files
 .terraformrc
 terraform.rc
+
+# dmair-backend staging — auto.tfvars holds the four sensitive vars
+# (db_password, jwt_secret_key, mail_password, admin_bootstrap_password)
+# that MUST NOT be committed. Use staging.auto.tfvars.example as the
+# template; CI passes the same values via TF_VAR_* environment variables.
+live/dmair/backend/staging/staging.auto.tfvars
+live/dmair/backend/staging/*.auto.tfvars
+!live/dmair/backend/staging/*.auto.tfvars.example
+# (setup-oidc-roles.sh is intentionally committed — it's the ops bootstrap
+# script for a new AWS environment. Contains no secrets; just CLI calls
+# that read docs/iam-oidc/*.json templates with placeholders.)

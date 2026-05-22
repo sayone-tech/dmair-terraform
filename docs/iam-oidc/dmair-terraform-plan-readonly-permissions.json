@@ -1,0 +1,71 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "StateBucketRead",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:ListBucket"],
+      "Resource": [
+        "arn:aws:s3:::dmair-terraform-prod",
+        "arn:aws:s3:::dmair-terraform-prod/*"
+      ]
+    },
+    {
+      "Sid": "StateLockfileRw",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::dmair-terraform-prod/*.tflock"
+    },
+    {
+      "Sid": "DescribeAllForRefresh",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:Describe*",
+        "ec2:Get*",
+        "rds:Describe*",
+        "rds:ListTagsForResource",
+        "ecr:Describe*",
+        "ecr:List*",
+        "ecr:Get*",
+        "ecr:BatchGetImage",
+        "secretsmanager:Describe*",
+        "secretsmanager:ListSecret*",
+        "secretsmanager:GetResourcePolicy",
+        "iam:Get*",
+        "iam:List*",
+        "cloudfront:Get*",
+        "cloudfront:List*",
+        "cloudfront:Describe*",
+        "s3:GetBucket*",
+        "s3:Get*Configuration",
+        "s3:GetObjectTagging",
+        "s3:ListBucket",
+        "s3:ListAllMyBuckets",
+        "logs:Describe*",
+        "logs:List*",
+        "ssm:Get*",
+        "ssm:Describe*",
+        "ssm:List*",
+        "route53:Get*",
+        "route53:List*",
+        "acm:Describe*",
+        "acm:List*",
+        "budgets:Describe*",
+        "budgets:View*",
+        "sts:GetCallerIdentity"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DecryptSsmSecureStrings",
+      "Effect": "Allow",
+      "Action": ["kms:Decrypt", "kms:DescribeKey"],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "kms:ViaService": "ssm.us-west-2.amazonaws.com"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,286 @@
+name: terraform
+
+# Triggers:
+#   - pull_request to main: terraform plan for every changed stack; posts the
+#     plan as a PR comment; blocks merge via required status check.
+#   - push to main: same plan, but instead of commenting on a PR, uploads the
+#     plan as a workflow artifact so an operator can review it before
+#     dispatching apply.
+#   - workflow_dispatch: manual operator action — picks ONE stack and runs
+#     plan+apply against it. Apply NEVER happens automatically on push.
+#     The 'prod' GitHub Environment with required reviewers gates the apply
+#     for bootstrap/ and live/dmair/<component>/prod stacks.
+#
+# IAM role ARNs are held as repo Secrets (not hardcoded in this workflow):
+#   - AWS_PLAN_ROLE_ARN          (dmair-terraform-plan-readonly)
+#   - AWS_STAGING_APPLY_ROLE_ARN (dmair-terraform-staging-apply)
+#   - AWS_PROD_APPLY_ROLE_ARN    (dmair-terraform-prod-apply)
+# The roles + OIDC identity provider are created out-of-band by ops — not
+# managed by Terraform. See docs/iam-oidc/ for the manual setup procedure.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      stack:
+        description: "Stack to terraform apply"
+        required: true
+        type: choice
+        options:
+          - bootstrap
+          - live/dmair/strapi/prod
+          - live/dmair/frontend/prod
+          - live/dmair/frontend/staging
+          - live/dmair/backend/staging
+
+permissions:
+  contents: read       # checkout
+  id-token: write      # OIDC assume-role
+  pull-requests: write # post plan as PR comment
+
+concurrency:
+  group: terraform-${{ github.ref }}-${{ github.event.inputs.stack || 'all' }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-west-2
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+
+jobs:
+  # --------------------------------------------------------------------
+  # detect-changes
+  # Outputs a JSON array of changed stack directories. modules/ and
+  # policies/ changes fan out to every stack (any of them could affect
+  # a stack's resource graph). Only runs on pull_request + push — the
+  # manual workflow_dispatch path skips this and targets one stack
+  # directly.
+  # --------------------------------------------------------------------
+  detect-changes:
+    name: Detect changed stacks
+    if: github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    outputs:
+      stacks: ${{ steps.list.outputs.stacks }}
+      has_changes: ${{ steps.list.outputs.has_changes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute changed stacks
+        id: list
+        run: |
+          set -euo pipefail
+          BASE="${{ github.event.pull_request.base.sha }}"
+          if [ -z "$BASE" ]; then
+            # push event — diff against parent
+            BASE="${{ github.event.before }}"
+          fi
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+            BASE=$(git rev-parse HEAD~1)
+          fi
+
+          CHANGED=$(git diff --name-only "$BASE" HEAD)
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          # If anything under modules/ or policies/ changed, plan every stack.
+          if echo "$CHANGED" | grep -E '^(modules|policies)/' >/dev/null; then
+            STACKS='["bootstrap","live/dmair/strapi/prod","live/dmair/frontend/prod","live/dmair/frontend/staging","live/dmair/backend/staging"]'
+          else
+            STACKS_SET=""
+            for stack in bootstrap live/dmair/strapi/prod live/dmair/frontend/prod live/dmair/frontend/staging live/dmair/backend/staging; do
+              if echo "$CHANGED" | grep -E "^$stack/" >/dev/null; then
+                STACKS_SET="$STACKS_SET \"$stack\","
+              fi
+            done
+            STACKS_SET="${STACKS_SET%,}"
+            STACKS="[$STACKS_SET]"
+          fi
+
+          echo "stacks=$STACKS"
+          echo "stacks=$STACKS" >> "$GITHUB_OUTPUT"
+          if [ "$STACKS" = "[]" ]; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  # --------------------------------------------------------------------
+  # plan
+  # Runs on PR + push-to-main. Per-stack matrix. Read-only plan-role
+  # only. PR -> posts plan as PR comment. Push -> uploads plan as
+  # artifact for review before manual dispatch.
+  # --------------------------------------------------------------------
+  plan:
+    name: terraform plan — ${{ matrix.stack }}
+    needs: detect-changes
+    if: github.event_name != 'workflow_dispatch' && needs.detect-changes.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        stack: ${{ fromJson(needs.detect-changes.outputs.stacks) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.3
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials (plan role)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_PLAN_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: terraform init
+        working-directory: ${{ matrix.stack }}
+        run: terraform init -input=false -no-color
+
+      - name: terraform fmt -check
+        working-directory: ${{ matrix.stack }}
+        run: terraform fmt -check -no-color
+
+      - name: terraform validate
+        working-directory: ${{ matrix.stack }}
+        run: terraform validate -no-color
+
+      - name: terraform plan
+        id: plan
+        working-directory: ${{ matrix.stack }}
+        run: |
+          # GitHub Actions runs steps with `bash -eo pipefail`, so a -detailed-exitcode
+          # of 2 (changes present) would abort the step before we can interpret it.
+          # Disable -e for the plan call, then re-enable for the rest of the step.
+          set +e
+          set -o pipefail
+          terraform plan -no-color -input=false -detailed-exitcode -out=tfplan 2>&1 | tee plan.txt
+          ec=${PIPESTATUS[0]}
+          set -e
+          # 0 = no changes, 2 = changes present (both are success); 1 = real error.
+          if [ "$ec" -eq 1 ]; then exit 1; fi
+          echo "exitcode=$ec" >> "$GITHUB_OUTPUT"
+
+      - name: Upload plan artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ matrix.stack }}
+          path: |
+            ${{ matrix.stack }}/tfplan
+            ${{ matrix.stack }}/plan.txt
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Post plan to PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const stack = '${{ matrix.stack }}';
+            let plan = fs.readFileSync(`${stack}/plan.txt`, 'utf8');
+            // Truncate to keep under GitHub's ~65k PR-comment limit.
+            const MAX = 60000;
+            if (plan.length > MAX) {
+              plan = plan.slice(0, MAX) +
+                `\n\n... [truncated ${plan.length - MAX} chars] — see workflow logs for full output ...`;
+            }
+            const body = `### \`terraform plan\` — \`${stack}\`\n\n` +
+                         '<details><summary>Plan output</summary>\n\n```terraform\n' +
+                         plan +
+                         '\n```\n\n</details>';
+            await github.rest.issues.createComment({
+              issue_number: context.payload.pull_request.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body,
+            });
+
+  # --------------------------------------------------------------------
+  # apply-staging
+  # Runs ONLY on workflow_dispatch and ONLY when the operator picks a
+  # staging stack (path ends with `/staging`). No GitHub Environment
+  # gate (staging is fast-iteration territory). Uses the staging-apply
+  # IAM role.
+  # --------------------------------------------------------------------
+  apply-staging:
+    name: terraform apply (staging) — ${{ github.event.inputs.stack }}
+    if: |
+      github.event_name == 'workflow_dispatch' &&
+      endsWith(github.event.inputs.stack, '/staging')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.3
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials (staging-apply role)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_STAGING_APPLY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: terraform init
+        working-directory: ${{ github.event.inputs.stack }}
+        run: terraform init -input=false -no-color
+
+      - name: terraform plan
+        working-directory: ${{ github.event.inputs.stack }}
+        run: terraform plan -no-color -input=false -out=tfplan
+
+      - name: terraform apply
+        working-directory: ${{ github.event.inputs.stack }}
+        run: terraform apply -input=false -no-color tfplan
+
+  # --------------------------------------------------------------------
+  # apply-prod
+  # Runs ONLY on workflow_dispatch and ONLY when the operator picks
+  # bootstrap, ci, or a live/dmair/prod/* stack. Gated by the 'prod'
+  # GitHub Environment with required reviewers (configured in repo
+  # Settings -> Environments). Uses the prod-apply IAM role, which is
+  # also scoped to assume only when the OIDC sub claim includes
+  # `environment:prod`.
+  # --------------------------------------------------------------------
+  apply-prod:
+    name: terraform apply (prod) — ${{ github.event.inputs.stack }}
+    if: |
+      github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.stack == 'bootstrap' ||
+       endsWith(github.event.inputs.stack, '/prod'))
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.3
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials (prod-apply role)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_PROD_APPLY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: terraform init
+        working-directory: ${{ github.event.inputs.stack }}
+        run: terraform init -input=false -no-color
+
+      - name: terraform plan
+        working-directory: ${{ github.event.inputs.stack }}
+        run: terraform plan -no-color -input=false -out=tfplan
+
+      - name: terraform apply
+        working-directory: ${{ github.event.inputs.stack }}
+        run: terraform apply -input=false -no-color tfplan

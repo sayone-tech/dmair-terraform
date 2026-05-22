@@ -1,0 +1,31 @@
+# live/dmair/backend/staging/staging.auto.tfvars.example
+#
+# Copy to `staging.auto.tfvars` (gitignored) and uncomment any overrides you
+# need. No sensitive values live here — db_password, jwt_secret_key,
+# mail_password, and admin_bootstrap_password are fetched from AWS SSM
+# Parameter Store at terraform plan time (see ssm.tf + DEVOPS-HANDOFF.md).
+#
+# This stack is intentionally tfvars-optional: the defaults in variables.tf
+# are tuned for staging; you only override when you need to deviate.
+
+# --- Non-secret overrides (uncomment any you need) -----------------------
+
+# aws_region               = "us-west-2"
+# vpc_cidr                 = "10.0.0.0/16"
+# instance_type            = "t4g.medium"
+# db_instance_class        = "db.t4g.micro"
+# db_engine_version        = "17"
+# db_allocated_storage     = 20
+# db_max_allocated_storage = 30
+# db_name                  = "dmair"
+# db_username              = "dmair_app"
+# db_backup_retention_days = 3
+# staging_domain           = "api-staging.flydmair.com"
+# budget_monthly_cap_usd   = 60
+# budget_alert_email       = "ops@flydmair.com"
+
+# Tighten this before exposing staging to real data:
+# web_ingress_cidrs        = ["0.0.0.0/0"]
+
+# First-apply placeholder; flip to the real image:tag after first push:
+# app_image                = "staging-latest"
