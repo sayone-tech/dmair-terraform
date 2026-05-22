@@ -155,11 +155,16 @@ jobs:
         id: plan
         working-directory: ${{ matrix.stack }}
         run: |
+          # GitHub Actions runs steps with `bash -eo pipefail`, so a -detailed-exitcode
+          # of 2 (changes present) would abort the step before we can interpret it.
+          # Disable -e for the plan call, then re-enable for the rest of the step.
+          set +e
           set -o pipefail
           terraform plan -no-color -input=false -detailed-exitcode -out=tfplan 2>&1 | tee plan.txt
-          # exit code 0 = no changes, 2 = changes present (both are success)
           ec=${PIPESTATUS[0]}
-          if [ $ec -eq 1 ]; then exit 1; fi
+          set -e
+          # 0 = no changes, 2 = changes present (both are success); 1 = real error.
+          if [ "$ec" -eq 1 ]; then exit 1; fi
           echo "exitcode=$ec" >> "$GITHUB_OUTPUT"
         env:
           TF_VAR_db_password: ${{ secrets.STAGING_BACKEND_DB_PASSWORD }}
