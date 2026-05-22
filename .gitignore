@@ -43,4 +43,6 @@ terraform.rc
 live/dmair/backend/staging/staging.auto.tfvars
 live/dmair/backend/staging/*.auto.tfvars
 !live/dmair/backend/staging/*.auto.tfvars.example
-setup-oidc-roles.sh
+# (setup-oidc-roles.sh is intentionally committed — it's the ops bootstrap
+# script for a new AWS environment. Contains no secrets; just CLI calls
+# that read docs/iam-oidc/*.json templates with placeholders.)
