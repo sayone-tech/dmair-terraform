@@ -27,24 +27,48 @@
 
 ## Sequence to apply
 
-### Step 1 — Populate sensitive variables
+### Step 1 — Populate sensitive values in SSM Parameter Store
 
-Either of:
+The 4 sensitive values (`db_password`, `jwt_secret_key`, `mail_password`, `admin_bootstrap_password`) are **NOT** Terraform variables and **NOT** GitHub Secrets. They live in AWS Systems Manager Parameter Store as `SecureString` parameters and are read at `terraform plan` / `apply` time via `data "aws_ssm_parameter"` blocks in `ssm.tf`.
 
-**(a) Local tfvars (gitignored):**
+Create them once (or after rotation) per environment:
+
 ```sh
-cd live/dmair/backend/staging
-cp staging.auto.tfvars.example staging.auto.tfvars
-# Edit staging.auto.tfvars — replace the four REPLACE_WITH_* values
+export AWS_PROFILE=<write-capable>
+REGION=us-west-2
+
+# db_password — RDS master/app user. 32-char random, ASCII-safe for RDS.
+aws ssm put-parameter --type SecureString --tier Standard --region "$REGION" \
+  --name /dmair/staging/db_password \
+  --value "$(LC_ALL=C tr -dc 'A-Za-z0-9!#%^&*_+-=' </dev/urandom | head -c 32)"
+
+# jwt_secret_key — HS512 signing key, 128 hex chars (>=64 required).
+aws ssm put-parameter --type SecureString --tier Standard --region "$REGION" \
+  --name /dmair/staging/jwt_secret_key \
+  --value "$(openssl rand -hex 64)"
+
+# mail_password — your SendGrid API key. Get from SendGrid → Settings → API Keys
+# → Create API Key with permission 'Mail Send: Full Access'. Save it to a
+# password manager when SendGrid shows it (one-time display).
+aws ssm put-parameter --type SecureString --tier Standard --region "$REGION" \
+  --name /dmair/staging/mail_password \
+  --value "<paste-the-real-sendgrid-key>"
+
+# admin_bootstrap_password — initial admin login (12-128 chars).
+# Save this to a password manager — you'll use it for the very first admin
+# login at https://api-staging.flydmair.com after the bootstrap container runs.
+aws ssm put-parameter --type SecureString --tier Standard --region "$REGION" \
+  --name /dmair/staging/admin_bootstrap_password \
+  --value "$(LC_ALL=C tr -dc 'A-Za-z0-9!#%^&*_+-=' </dev/urandom | head -c 24)"
 ```
 
-**(b) CI environment:**
-```sh
-export TF_VAR_db_password=...
-export TF_VAR_jwt_secret_key=...
-export TF_VAR_mail_password=...
-export TF_VAR_admin_bootstrap_password=...
-```
+To **rotate** any of them later: same command with `--overwrite`. After rotation, run `terraform apply` to refresh the Secrets Manager secret (which the dmair-backend app reads at container start). For `db_password` specifically, also `-target=aws_db_instance.postgres` apply will push the new password to RDS.
+
+The 3 terraform CI roles already have:
+- `ssm:GetParameter*` via the broad refresh statement.
+- `kms:Decrypt` scoped to `kms:ViaService=ssm.us-west-2.amazonaws.com` (the SecureString values are encrypted with the AWS-managed `aws/ssm` KMS key).
+
+So once the parameters exist, CI plan + apply work end-to-end with no additional secrets.
 
 ### Step 2 — Init + plan + apply
 

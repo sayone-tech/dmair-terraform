@@ -166,11 +166,6 @@ jobs:
           # 0 = no changes, 2 = changes present (both are success); 1 = real error.
           if [ "$ec" -eq 1 ]; then exit 1; fi
           echo "exitcode=$ec" >> "$GITHUB_OUTPUT"
-        env:
-          TF_VAR_db_password: ${{ secrets.STAGING_BACKEND_DB_PASSWORD }}
-          TF_VAR_jwt_secret_key: ${{ secrets.STAGING_BACKEND_JWT_SECRET }}
-          TF_VAR_mail_password: ${{ secrets.STAGING_BACKEND_MAIL_PASSWORD }}
-          TF_VAR_admin_bootstrap_password: ${{ secrets.STAGING_BACKEND_ADMIN_PASSWORD }}
 
       - name: Upload plan artifact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -241,13 +236,7 @@ jobs:
 
       - name: terraform plan
         working-directory: ${{ github.event.inputs.stack }}
-        run: |
-          terraform plan -no-color -input=false -out=tfplan
-        env:
-          TF_VAR_db_password: ${{ secrets.STAGING_BACKEND_DB_PASSWORD }}
-          TF_VAR_jwt_secret_key: ${{ secrets.STAGING_BACKEND_JWT_SECRET }}
-          TF_VAR_mail_password: ${{ secrets.STAGING_BACKEND_MAIL_PASSWORD }}
-          TF_VAR_admin_bootstrap_password: ${{ secrets.STAGING_BACKEND_ADMIN_PASSWORD }}
+        run: terraform plan -no-color -input=false -out=tfplan
 
       - name: terraform apply
         working-directory: ${{ github.event.inputs.stack }}

@@ -1,38 +1,31 @@
-# live/dmair/staging/backend/staging.auto.tfvars.example
+# live/dmair/backend/staging/staging.auto.tfvars.example
 #
-# Copy to `staging.auto.tfvars` (gitignored) and fill in the sensitive values
-# locally, OR pass them via TF_VAR_<name> in CI. Never commit the populated
-# file.
+# Copy to `staging.auto.tfvars` (gitignored) and uncomment any overrides you
+# need. No sensitive values live here — db_password, jwt_secret_key,
+# mail_password, and admin_bootstrap_password are fetched from AWS SSM
+# Parameter Store at terraform plan time (see ssm.tf + DEVOPS-HANDOFF.md).
+#
+# This stack is intentionally tfvars-optional: the defaults in variables.tf
+# are tuned for staging; you only override when you need to deviate.
 
-# --- Non-secret overrides (optional — defaults usually fine) -------------
+# --- Non-secret overrides (uncomment any you need) -----------------------
 
-# aws_region              = "us-west-2"
-# vpc_cidr                = "10.0.0.0/16"
-# instance_type           = "t4g.medium"
-# db_instance_class       = "db.t4g.micro"
-# db_engine_version       = "16"
-# db_allocated_storage    = 20
-# db_name                 = "dmair"
-# db_username             = "dmair_app"
-# db_backup_retention_days = 7
-# staging_domain          = "api-staging.flydmair.com"
-# budget_monthly_cap_usd  = 60
-# budget_alert_email      = "ops@flydmair.com"
-# github_org              = "sayone-tech"
-# github_repo             = "dmair-backend"
-# github_deploy_branches  = ["ref:refs/heads/staging", "environment:staging"]
+# aws_region               = "us-west-2"
+# vpc_cidr                 = "10.0.0.0/16"
+# instance_type            = "t4g.medium"
+# db_instance_class        = "db.t4g.micro"
+# db_engine_version        = "17"
+# db_allocated_storage     = 20
+# db_max_allocated_storage = 30
+# db_name                  = "dmair"
+# db_username              = "dmair_app"
+# db_backup_retention_days = 3
+# staging_domain           = "api-staging.flydmair.com"
+# budget_monthly_cap_usd   = 60
+# budget_alert_email       = "ops@flydmair.com"
 
 # Tighten this before exposing staging to real data:
-# web_ingress_cidrs       = ["0.0.0.0/0"]
+# web_ingress_cidrs        = ["0.0.0.0/0"]
 
-# First-apply placeholder; flip to the real image:tag after first push.
-# app_image               = "staging-latest"
-
-# --- Sensitive — generate strong values ---------------------------------
-# Replace with real values; the four below MUST be set for terraform plan
-# to succeed (no defaults on these vars).
-
-db_password              = "REPLACE_WITH_STRONG_PASSWORD"
-jwt_secret_key           = "REPLACE_WITH_64+_CHAR_HS512_KEY"   # e.g. `openssl rand -hex 64`
-mail_password            = "REPLACE_WITH_SENDGRID_API_KEY"
-admin_bootstrap_password = "REPLACE_WITH_12_TO_128_CHARS"
+# First-apply placeholder; flip to the real image:tag after first push:
+# app_image                = "staging-latest"

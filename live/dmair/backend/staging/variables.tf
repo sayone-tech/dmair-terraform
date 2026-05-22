@@ -1,12 +1,12 @@
-# live/dmair/staging/backend/variables.tf
+# live/dmair/backend/staging/variables.tf
 #
 # Variables for the dmair-backend staging stack. Defaults mirror the spec in
-# `DMAir/dmair-backend/deployment/staging/STAGING-DEPLOYMENT.md` (commit-time
-# snapshot of that doc lives in our DEVOPS-HANDOFF.md for review).
+# `DMAir/dmair-backend/deployment/staging/STAGING-DEPLOYMENT.md`.
 #
-# Secret values (db_password, jwt_secret_key, mail_password,
-# admin_bootstrap_password) MUST be supplied via TF_VAR_<name> environment
-# variables (or a gitignored `staging.auto.tfvars`) — they are never committed.
+# Sensitive values (db_password, jwt_secret_key, mail_password,
+# admin_bootstrap_password) are NOT variables. They are fetched at terraform
+# plan/apply time from AWS SSM Parameter Store — see ssm.tf for the data
+# sources and the put-parameter setup commands in DEVOPS-HANDOFF.md.
 
 variable "aws_region" {
   description = "AWS region. us-west-2 is the only supported value at the moment."
@@ -51,15 +51,21 @@ variable "db_instance_class" {
 }
 
 variable "db_engine_version" {
-  description = "PostgreSQL major version. 16 is the spec target."
+  description = "PostgreSQL major version."
   type        = string
-  default     = "16"
+  default     = "17"
 }
 
 variable "db_allocated_storage" {
   description = "Initial DB storage in GB. gp3."
   type        = number
   default     = 20
+}
+
+variable "db_max_allocated_storage" {
+  description = "Storage autoscale ceiling in GB. RDS scales up to this value when usage approaches allocated_storage."
+  type        = number
+  default     = 30
 }
 
 variable "db_name" {
@@ -74,36 +80,10 @@ variable "db_username" {
   default     = "dmair_app"
 }
 
-variable "db_password" {
-  description = "RDS master/app password. Supply via TF_VAR_db_password — never commit."
-  type        = string
-  sensitive   = true
-}
-
 variable "db_backup_retention_days" {
-  description = "Automated backup retention in days. 7 fits within free backup-storage allocation when allocated_storage = 20."
+  description = "Automated backup retention in days. 3 keeps backup storage well within the free allocation when allocated_storage = 20."
   type        = number
-  default     = 7
-}
-
-# --- Secrets --------------------------------------------------------------
-
-variable "jwt_secret_key" {
-  description = "JWT signing key (HS512, >=64 chars). Supply via TF_VAR_jwt_secret_key."
-  type        = string
-  sensitive   = true
-}
-
-variable "mail_password" {
-  description = "SendGrid API key (Mail password). Supply via TF_VAR_mail_password."
-  type        = string
-  sensitive   = true
-}
-
-variable "admin_bootstrap_password" {
-  description = "Initial admin bootstrap password (12-128 chars). Supply via TF_VAR_admin_bootstrap_password."
-  type        = string
-  sensitive   = true
+  default     = 3
 }
 
 # --- App image ------------------------------------------------------------
