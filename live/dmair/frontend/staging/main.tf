@@ -151,3 +151,4 @@ module "cloudfront_dist" {
   domain                      = "" # No custom domain
   viewer_request_function_arn = ""
 }
+
