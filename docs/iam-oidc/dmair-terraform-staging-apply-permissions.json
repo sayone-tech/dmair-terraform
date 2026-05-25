@@ -169,7 +169,9 @@
         "iam:DeletePolicy",
         "iam:CreatePolicyVersion",
         "iam:DeletePolicyVersion",
-        "iam:SetDefaultPolicyVersion"
+        "iam:SetDefaultPolicyVersion",
+        "iam:TagPolicy",
+        "iam:UntagPolicy"
       ],
       "Resource": [
         "arn:aws:iam::ACCOUNT_ID:role/dmair-staging-*",

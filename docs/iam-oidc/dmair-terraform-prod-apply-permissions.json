@@ -170,6 +170,8 @@
         "iam:CreatePolicyVersion",
         "iam:DeletePolicyVersion",
         "iam:SetDefaultPolicyVersion",
+        "iam:TagPolicy",
+        "iam:UntagPolicy",
         "iam:CreateUser",
         "iam:DeleteUser",
         "iam:UpdateUser",
