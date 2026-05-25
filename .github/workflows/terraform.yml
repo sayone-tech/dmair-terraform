@@ -167,11 +167,18 @@ jobs:
           if [ "$ec" -eq 1 ]; then exit 1; fi
           echo "exitcode=$ec" >> "$GITHUB_OUTPUT"
 
+      - name: Compute artifact name
+        id: artifact_name
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          safe="${{ matrix.stack }}"
+          echo "name=tfplan-${safe//\//-}" >> "$GITHUB_OUTPUT"
+
       - name: Upload plan artifact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
-          name: tfplan-${{ matrix.stack }}
+          name: ${{ steps.artifact_name.outputs.name }}
           path: |
             ${{ matrix.stack }}/tfplan
             ${{ matrix.stack }}/plan.txt
