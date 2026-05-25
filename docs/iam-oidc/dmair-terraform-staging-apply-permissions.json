@@ -52,6 +52,7 @@
         "acm:List*",
         "budgets:Describe*",
         "budgets:View*",
+        "budgets:ListTagsForResource",
         "sts:GetCallerIdentity"
       ],
       "Resource": "*"
@@ -174,7 +175,8 @@
         "iam:DeletePolicyVersion",
         "iam:SetDefaultPolicyVersion",
         "iam:TagPolicy",
-        "iam:UntagPolicy"
+        "iam:UntagPolicy",
+        "iam:PassRole"
       ],
       "Resource": [
         "arn:aws:iam::ACCOUNT_ID:role/dmair-staging-*",
@@ -204,6 +206,17 @@
       "Condition": {
         "StringEquals": {
           "kms:ViaService": "ssm.us-west-2.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Sid": "AllowRdsServiceLinkedRole",
+      "Effect": "Allow",
+      "Action": "iam:CreateServiceLinkedRole",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "iam:AWSServiceName": "rds.amazonaws.com"
         }
       }
     }

@@ -142,7 +142,7 @@ echo "==> Step 3: SSM SecureString parameters (4)"
 
 ssm_create_if_missing \
   "/dmair/staging/db_password" \
-  "$(LC_ALL=C tr -dc 'A-Za-z0-9!#%^&*_+-=' </dev/urandom | head -c 32)" \
+  "$(LC_ALL=C tr -dc 'A-Za-z0-9!#%^&*_+=' </dev/urandom | head -c 32)" \
   "RDS master/app password for dmair-staging Postgres"
 
 ssm_create_if_missing \
@@ -157,7 +157,7 @@ ssm_create_if_missing \
 
 ssm_create_if_missing \
   "/dmair/staging/admin_bootstrap_password" \
-  "$(LC_ALL=C tr -dc 'A-Za-z0-9!#%^&*_+-=' </dev/urandom | head -c 24)" \
+  "$(LC_ALL=C tr -dc 'A-Za-z0-9!#%^&*_+=' </dev/urandom | head -c 24)" \
   "Initial admin bootstrap password for dmair-backend staging"
 
 echo
