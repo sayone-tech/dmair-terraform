@@ -6,9 +6,11 @@
 #   1. GitHub OIDC identity provider (once per AWS account)
 #   2. The 3 Terraform CI IAM roles (from docs/iam-oidc/*.json)
 #   3. The 4 SSM SecureString parameters at /dmair/staging/*
-#   4. (NOT covered, manual) the dmair-backend-staging-deploy role
-#      because it needs the EC2 instance ID — deferred until after
-#      live/dmair/backend/staging has been terraform-applied.
+#   4. The dmair-backend-staging-deploy role — created only when
+#      STAGING_EC2_INSTANCE_ID is exported with the real instance id,
+#      because its permissions policy scopes ssm:StartSession to that
+#      specific EC2 ARN. If the env var is unset (defaults to
+#      PENDING_PHASE_3_APPLY), Step 4 is skipped with a hint.
 #
 # Run from the repo root after `export AWS_PROFILE=<write-capable>`.
 # Requires: aws, jq, openssl.
@@ -163,6 +165,32 @@ ssm_create_if_missing \
 echo
 
 # ----------------------------------------------------------------------------
+# 4. dmair-backend-staging-deploy role (needs EC2 instance ID)
+# ----------------------------------------------------------------------------
+
+# The sibling dmair-backend repo's CI uses this role to push images to ECR
+# and restart the systemd unit on the staging EC2. Its permissions policy
+# pins ssm:StartSession + ssm:SendCommand to the specific EC2 instance ARN,
+# so we can only create it after live/dmair/backend/staging has been applied.
+
+echo "==> Step 4: dmair-backend-staging-deploy role"
+if [ "$STAGING_EC2_INSTANCE_ID" = "PENDING_PHASE_3_APPLY" ]; then
+  echo "  skipped — STAGING_EC2_INSTANCE_ID not set."
+  echo "  Run again with: STAGING_EC2_INSTANCE_ID=i-xxxxx $0"
+else
+  # Re-validate the rendered templates now that we expect real values.
+  if grep -lE "PENDING_PHASE_3_APPLY|STAGING_EC2_INSTANCE_ID" \
+      "$WORK"/dmair-backend-staging-deploy-*.json >/dev/null; then
+    echo "ERROR: placeholders still in dmair-backend-staging-deploy templates"
+    echo "  ensure STAGING_EC2_INSTANCE_ID is a real EC2 id (e.g. i-0abc...)"
+    exit 1
+  fi
+  create_role "dmair-backend-staging-deploy" \
+    "GitHub Actions OIDC deploy role for sibling dmair-backend repo (staging)"
+fi
+echo
+
+# ----------------------------------------------------------------------------
 # Summary
 # ----------------------------------------------------------------------------
 
@@ -186,6 +214,14 @@ echo "  AWS_PLAN_ROLE_ARN           = <plan-readonly ARN above>"
 echo "  AWS_STAGING_APPLY_ROLE_ARN  = <staging-apply ARN above>"
 echo "  AWS_PROD_APPLY_ROLE_ARN     = <prod-apply ARN above>"
 echo
+if [ "$STAGING_EC2_INSTANCE_ID" != "PENDING_PHASE_3_APPLY" ]; then
+  echo "Sibling dmair-backend repo Secret to set:"
+  backend_arn=$(aws iam get-role --role-name dmair-backend-staging-deploy \
+    --query 'Role.Arn' --output text 2>/dev/null)
+  echo "  AWS_DEPLOY_ROLE_ARN         = $backend_arn"
+  echo "  (Settings → Secrets and variables → Actions in the dmair-backend repo)"
+  echo
+fi
 echo "SSM parameter inventory:"
 aws ssm describe-parameters --region "$REGION" \
   --parameter-filters "Key=Name,Option=BeginsWith,Values=/dmair/staging/" \
@@ -199,5 +235,7 @@ echo "      --name /dmair/staging/mail_password --value '<real-api-key>'"
 echo "  - Configure 'prod' GitHub Environment with required reviewers"
 echo "    (Settings → Environments → New environment → prod)"
 echo "  - Enable branch protection on main, require 'terraform / Detect changed stacks'"
-echo "  - After Phase 3 apply, create the dmair-backend-staging-deploy role"
-echo "    (re-run this script with STAGING_EC2_INSTANCE_ID=i-... exported)"
+if [ "$STAGING_EC2_INSTANCE_ID" = "PENDING_PHASE_3_APPLY" ]; then
+  echo "  - After Phase 3 apply, create the dmair-backend-staging-deploy role"
+  echo "    (re-run this script with STAGING_EC2_INSTANCE_ID=i-... exported)"
+fi
