@@ -118,7 +118,8 @@
         "secretsmanager:Put*",
         "secretsmanager:Restore*",
         "secretsmanager:TagResource",
-        "secretsmanager:UntagResource"
+        "secretsmanager:UntagResource",
+        "secretsmanager:GetSecretValue"
       ],
       "Resource": "arn:aws:secretsmanager:us-west-2:ACCOUNT_ID:secret:dmair/staging/*"
     },
