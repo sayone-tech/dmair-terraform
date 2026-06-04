@@ -1,6 +1,6 @@
 # dmair-terraform
 
-AWS infrastructure-as-code for the `flydmair.com` product surface — a Strapi CMS, a marketing/SPA frontend (`www.flydmair.com`, `flydmair.com`), a staging frontend (`staging.flydmair.com`), and (Phase 3 onward) a staging backend (`api-staging.flydmair.com`).
+AWS infrastructure-as-code for the `flydmair.com` product surface — a Strapi CMS, a marketing/SPA frontend (`www.flydmair.com`, `flydmair.com`), a staging frontend (`staging.flydmair.com`), and (Phase 3 onward) a staging backend (`staging-api.flydmair.com`).
 
 **Region:** `us-west-2` (all stacks)
 **AWS account:** single shared `dmair` account, profile `dmair`
@@ -29,7 +29,7 @@ dmair-terraform/
 │   │                                   # State key: frontend/staging/terraform.tfstate
 │   └── backend/
 │       └── staging/                    # dmair-backend staging slot
-│                                       #   (api-staging.flydmair.com).
+│                                       #   (staging-api.flydmair.com).
 │                                       # State key: staging/backend/terraform.tfstate
 │
 ├── modules/                            # Reusable local Terraform modules.
@@ -178,13 +178,13 @@ This repo is mid-migration as of 2026-05. See [`.planning/ROADMAP.md`](.planning
 
 1. **Phase 1 — Bootstrap State Backend** (in DevOps review): `bootstrap/` stack adopts `dmair-terraform-prod` via import, every live backend rewires to `use_lockfile = true`, two-terminal lock contention proves the lock works.
 2. **Phase 2 — Refactor to `live/` Layout** (in DevOps review): `envs/` → `live/dmair/<component>/<env>/`, README rewrite, staging slot reserved.
-3. **Phase 3 — dmair-backend Staging Slot:** `live/dmair/backend/staging/` (VPC, EC2 + EIP, RDS PostGIS, ECR, Secrets) deployable at `api-staging.flydmair.com`. The `dmair-backend-staging-deploy` OIDC role is created out-of-band by ops — see [`docs/iam-oidc/`](docs/iam-oidc/).
+3. **Phase 3 — dmair-backend Staging Slot:** `live/dmair/backend/staging/` (VPC, EC2 + EIP, RDS PostGIS, ECR, Secrets) deployable at `staging-api.flydmair.com`. The `dmair-backend-staging-deploy` OIDC role is created out-of-band by ops — see [`docs/iam-oidc/`](docs/iam-oidc/).
 4. **Phase 4 — CI/CD Pipeline + OIDC:** PR-gated plans + manual `workflow_dispatch` applies, with GitHub Environments + required reviewers for prod. OIDC trust + role inventory + JSON templates in [`docs/iam-oidc/`](docs/iam-oidc/).
 
 ## Cross-repo
 
 This repo is consumed by [`dmair-backend`](https://github.com/<org>/dmair-backend) via two contracts that are expensive to rename after they land:
-- DNS: `api-staging.flydmair.com` (created Phase 3).
+- DNS: `staging-api.flydmair.com` (created Phase 3).
 - OIDC role ARN: name finalized in Phase 3, documented in [`docs/iam-oidc/README.md`](docs/iam-oidc/README.md) (Phase 4).
 
 ## Reference
