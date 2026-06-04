@@ -1,5 +1,5 @@
 output "elastic_ip" {
-  description = "Public IP for api-staging.flydmair.com. Point your GoDaddy A record at this value."
+  description = "Public IP for staging-api.flydmair.com. Point your GoDaddy A record at this value."
   value       = aws_eip.app.public_ip
 }
 

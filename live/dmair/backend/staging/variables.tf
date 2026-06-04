@@ -99,7 +99,7 @@ variable "app_image" {
 variable "staging_domain" {
   description = "Public hostname for the staging backend. Caddy obtains a Let's Encrypt cert for this name."
   type        = string
-  default     = "api-staging.flydmair.com"
+  default     = "staging-api.flydmair.com"
 }
 
 # --- Cost alarm -----------------------------------------------------------
