@@ -72,10 +72,15 @@ replacement. Worked on branch `feat/staging-ingest-oauth`, atomic commits, NOT a
 CI's plan on the branch surfaced an unrelated, pre-existing failure:
 `budgets:ListTagsForResource` AccessDenied on the `dmair-terraform-plan-readonly` role when the
 provider refreshes `aws_budgets_budget` (`budget.tf`, not touched by this task). The refresh block
-granted `budgets:Describe*` + `budgets:View*` but not the tag-listing action. Added
-`budgets:ListTagsForResource` to all three OIDC policy templates (plan-readonly, staging-apply,
-prod-apply — the apply roles embed the same refresh block, so apply would hit the same error).
-Commit `853efb2`. Requires ops to re-apply the inline policies (`put-role-policy`, idempotent).
+granted `budgets:Describe*` + `budgets:View*` but not the tag-listing action.
+
+**Scoped to plan-readonly only.** Initially added to all three OIDC templates (commit `853efb2`),
+then reverted the staging-apply / prod-apply edits (commit `89a56d9`) on discovering that the
+in-flight **PR #9 (fix/oidc-iam-tagpolicy)** already adds the identical line to both apply files —
+keeping it here would be an add/add conflict. PR #9 does NOT touch `plan-readonly`, and CI runs
+`plan` under that role, so the plan-readonly fix is the unique piece that unblocks the CI budget
+refresh and stays in this PR. Net OIDC change in PR #10: plan-readonly +1 line. Requires ops to
+re-apply the plan-readonly inline policy (`put-role-policy`, idempotent).
 
 ## Operator follow-ups (apply-time, NOT terraform)
 
@@ -86,5 +91,6 @@ Commit `853efb2`. Requires ops to re-apply the inline policies (`put-role-policy
    Google OAuth client.
 3. After apply + redeploy: run Connect Mail on staging OR seed `dmair/ingest/google-refresh-token`
    by copying the existing dev token.
-4. Re-apply the three OIDC inline policies so the `budgets:ListTagsForResource` fix takes effect
-   (`aws iam put-role-policy ...`, idempotent — see docs/iam-oidc/README.md).
+4. Re-apply the **plan-readonly** OIDC inline policy so the `budgets:ListTagsForResource` fix
+   takes effect (`aws iam put-role-policy ...`, idempotent — see docs/iam-oidc/README.md). The
+   staging-apply / prod-apply equivalents land via PR #9.
