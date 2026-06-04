@@ -52,7 +52,6 @@
         "acm:List*",
         "budgets:Describe*",
         "budgets:View*",
-        "budgets:ListTagsForResource",
         "sts:GetCallerIdentity"
       ],
       "Resource": "*"
