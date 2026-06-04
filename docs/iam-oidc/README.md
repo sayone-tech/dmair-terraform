@@ -34,7 +34,7 @@ Idempotency: this fails with `EntityAlreadyExists` if the IDP already exists —
 | File | Purpose |
 |---|---|
 | `dmair-terraform-plan-readonly-trust.json` | Trust policy for the plan-readonly role — `ACCOUNT_ID` + `ORG/REPO` placeholders. Subject allows PR + push-to-main. |
-| `dmair-terraform-plan-readonly-permissions.json` | Refresh-only `Describe*`/`Get*`/`List*` perms + state-bucket read + `.tflock` RW. No `secretsmanager:GetSecretValue`. |
+| `dmair-terraform-plan-readonly-permissions.json` | Refresh-only `Describe*`/`Get*`/`List*` perms + state-bucket read + `.tflock` RW. Includes `budgets:ListTagsForResource` (budget refresh) and a single `secretsmanager:GetSecretValue` scoped to `dmair/staging/app-*` only (needed to refresh the managed `aws_secretsmanager_secret_version`; no broad secret read). |
 | `dmair-terraform-staging-apply-trust.json` | Trust policy for staging-apply — `ACCOUNT_ID` + `ORG/REPO` placeholders. Subject restricted to `ref:refs/heads/main`. |
 | `dmair-terraform-staging-apply-permissions.json` | plan-readonly perms + scoped staging writes — `ACCOUNT_ID` placeholder. (Single file; size fits inline policy limit.) |
 | `dmair-terraform-prod-apply-trust.json` | Trust policy for prod-apply — `ACCOUNT_ID` + `ORG/REPO` placeholders. Subject restricted to `environment:prod` (GitHub Environment with required reviewers is the load-bearing gate). |

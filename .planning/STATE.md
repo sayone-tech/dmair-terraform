@@ -80,6 +80,19 @@ None. Phase 1 has no upstream dependency.
 - **Single shared AWS account** — OIDC role for dmair-backend CI (Phase 3) must be tag/prefix-scoped to deny existing `cms-*` / `frontend-*` resources. Verified by explicit deny-by-exclusion test.
 - **Cross-repo contract:** `staging-api.flydmair.com` DNS name and OIDC role name are consumed by `dmair-backend`. Renaming them later is expensive.
 
+### Lessons & Guardrails (backend/staging — learned 2026-06-04, Phase 13 enablement)
+
+These three footgun classes each caused a live incident this session. Check them on **every** future change to `live/dmair/backend/staging`.
+
+1. **No-tfvars default footgun.** CI (`plan-readonly`) and any `terraform apply -replace` run with **no** local `staging.auto.tfvars` (it is gitignored), so they fall back to the committed `default`s. A `default` that is a placeholder "only works because my local tfvars overrides it" is a landmine that silently ships a wrong value to a real apply. Hit **twice**: `staging_domain` defaulted to the dead `api-staging.flydmair.com` (fixed PR #12) and `app_image` defaulted to a bare `staging-latest` tag, not a pullable URI (fixed PR #15).
+   - **Guardrail:** every `variables.tf` default for this stack MUST render a working value with zero tfvars. Before adding a var with a default, ask *"what does a CI/no-tfvars apply produce?"* Added a `validation` on `app_image` that rejects a bare tag. CI's green plan ≠ correct values — verify the **rendered** `user_data`/secret, not just that the plan is clean.
+
+2. **Consolidated secret is rebuilt from SSM on every apply.** `dmair/staging/app` is `jsonencode`'d from `data.aws_ssm_parameter.*` (`secrets.tf`), so the `aws_secretsmanager_secret_version` is replaced from SSM on each apply and **any hand-edit to the secret is reverted**. The real SendGrid key lived only in the secret (SSM `/dmair/staging/mail_password` was a placeholder), so the Phase-13 apply clobbered it → SMTP 535, `/actuator/health` DOWN.
+   - **Guardrail:** SSM Parameter Store is the source of truth — populate **every** `/dmair/staging/*` param with the real value; never patch the secret directly expecting it to persist. (Recovered the key from the secret's `AWSPREVIOUS` version and wrote it back to SSM.)
+
+3. **`user_data` changes need `-replace`.** cloud-init runs once at first boot, so a plain `apply` updates the `user_data` attribute (a stop/start) but does **not** regenerate `/opt/dmair/docker-compose.staging.yml` — the change silently has no effect on the running app.
+   - **Guardrail:** any user-data / compose change requires `terraform apply -replace=aws_instance.app`. For a **0-destroy hotfix**, SSM-patch the on-disk compose and re-run `start.sh` (recreates only the `app` container) — but still merge the code so a future rebuild keeps it.
+
 ## Session Continuity
 
 **Resume point:** Run `/gsd-plan-phase 1` to decompose Phase 1 into plans.

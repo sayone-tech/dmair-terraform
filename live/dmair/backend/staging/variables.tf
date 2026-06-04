@@ -89,9 +89,18 @@ variable "db_backup_retention_days" {
 # --- App image ------------------------------------------------------------
 
 variable "app_image" {
-  description = "Full ECR image URI incl. tag (e.g. 071297531943.dkr.ecr.us-west-2.amazonaws.com/dmair-backend:<sha>). First apply may use 'staging-latest' before the first image is pushed."
+  description = "Full ECR image URI incl. tag (e.g. 071297531943.dkr.ecr.us-west-2.amazonaws.com/dmair-backend:<sha>). Default targets the current staging-latest tag so a no-tfvars apply (CI) pulls a valid image; override with a pinned :<sha> for deterministic deploys."
   type        = string
-  default     = "staging-latest"
+  default     = "071297531943.dkr.ecr.us-west-2.amazonaws.com/dmair-backend:staging-latest"
+
+  # Guardrail (STATE.md 'Lessons & Guardrails' #1): reject a bare tag. CI and
+  # -replace run with no local tfvars and fall back to this default, so a bare
+  # "staging-latest" would silently resolve to docker.io/library/staging-latest
+  # and the app container could not start on a fresh instance.
+  validation {
+    condition     = can(regex("\\.dkr\\.ecr\\.[a-z0-9-]+\\.amazonaws\\.com/.+:.+", var.app_image))
+    error_message = "app_image must be a FULL ECR image URI (<acct>.dkr.ecr.<region>.amazonaws.com/<repo>:<tag>), not a bare tag."
+  }
 }
 
 # --- Domain ---------------------------------------------------------------
@@ -100,6 +109,12 @@ variable "staging_domain" {
   description = "Public hostname for the staging backend. Caddy obtains a Let's Encrypt cert for this name."
   type        = string
   default     = "staging-api.flydmair.com"
+}
+
+variable "staging_frontend_origin" {
+  description = "Browser origin of the staging dashboard SPA that calls the backend API (CORS)."
+  type        = string
+  default     = "https://staging-dashboard.flydmair.com"
 }
 
 # --- Cost alarm -----------------------------------------------------------
