@@ -88,6 +88,10 @@ services:
       JWT_SECRET_KEY: $${JWT_SECRET_KEY:?from Secrets Manager}
       DB_PASSWORD: $${DB_PASSWORD:?from Secrets Manager}
       MAIL_PASSWORD: $${MAIL_PASSWORD:?from Secrets Manager}
+      # Phase 13 ingest — optional at boot (app must still start if unset)
+      INGEST_OAUTH_GOOGLE_CLIENT_ID: $${INGEST_OAUTH_GOOGLE_CLIENT_ID:-}
+      INGEST_OAUTH_GOOGLE_CLIENT_SECRET: $${INGEST_OAUTH_GOOGLE_CLIENT_SECRET:-}
+      INGEST_OAUTH_GOOGLE_REDIRECT_URI: $${INGEST_OAUTH_GOOGLE_REDIRECT_URI:-}
     logging:
       driver: awslogs
       options:

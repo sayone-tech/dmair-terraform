@@ -1,4 +1,4 @@
-# SSM Parameter Store — single source of truth for the 4 sensitive values.
+# SSM Parameter Store — single source of truth for the sensitive values.
 #
 # Out-of-band setup (ops, one-time per environment):
 #   aws ssm put-parameter --type SecureString --tier Standard --region us-west-2 \
@@ -9,6 +9,13 @@
 #       --name /dmair/staging/mail_password            --value "<sendgrid-api-key>"
 #   aws ssm put-parameter --type SecureString --tier Standard --region us-west-2 \
 #       --name /dmair/staging/admin_bootstrap_password --value "<gen>"
+#
+# Phase 13 ingest (Google OAuth / IMAP mailbox) — values come from the Google
+# Cloud OAuth client (NEVER commit secret values to terraform):
+#   aws ssm put-parameter --type SecureString --tier Standard --region us-west-2 \
+#       --name /dmair/staging/ingest_oauth_google_client_id     --value "<oauth-client-id>"
+#   aws ssm put-parameter --type SecureString --tier Standard --region us-west-2 \
+#       --name /dmair/staging/ingest_oauth_google_client_secret --value "<oauth-client-secret>"
 #
 # Rotation: aws ssm put-parameter --overwrite --value "<new>". Then re-apply
 # this stack (or re-deploy the dmair-backend app for the secrets that flow
@@ -36,5 +43,15 @@ data "aws_ssm_parameter" "mail_password" {
 
 data "aws_ssm_parameter" "admin_bootstrap_password" {
   name            = "/dmair/staging/admin_bootstrap_password"
+  with_decryption = true
+}
+
+data "aws_ssm_parameter" "ingest_oauth_google_client_id" {
+  name            = "/dmair/staging/ingest_oauth_google_client_id"
+  with_decryption = true
+}
+
+data "aws_ssm_parameter" "ingest_oauth_google_client_secret" {
+  name            = "/dmair/staging/ingest_oauth_google_client_secret"
   with_decryption = true
 }

@@ -17,7 +17,7 @@ progress:
 
 **Last Updated:** 2026-05-20
 
-Last activity: 2026-05-21
+Last activity: 2026-06-04 - Completed quick task 260604-rec: Enable Phase 13 ingest (Google OAuth/IMAP) on backend staging
 
 ## Project Reference
 
@@ -71,6 +71,7 @@ None. Phase 1 has no upstream dependency.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260520-ntp | Drop DynamoDB locking from Phase 1, use S3-native use_lockfile and bump Terraform pin to ~> 1.15 | 2026-05-20 | 015809f | [260520-ntp-drop-dynamodb-locking-from-phase-1-use-s](./quick/260520-ntp-drop-dynamodb-locking-from-phase-1-use-s/) |
+| 260604-rec | Enable Phase 13 ingest (Google OAuth/IMAP mailbox) on backend staging | 2026-06-04 | (see PR feat/staging-ingest-oauth) | [260604-rec-enable-phase-13-ingest-google-oauth-imap](./quick/260604-rec-enable-phase-13-ingest-google-oauth-imap/) |
 
 ### Risks Logged
 
