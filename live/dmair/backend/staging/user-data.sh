@@ -83,7 +83,7 @@ services:
       MAIL_SMTP_STARTTLS: "true"
       MAIL_FROM: no-reply@flydmair.com
       APP_URL: "https://__DOMAIN__"
-      FRONTEND_BASE_URL: "https://__DOMAIN__"
+      FRONTEND_BASE_URL: "__FRONTEND_ORIGIN__"
       CORS_ALLOWED_ORIGINS: "__FRONTEND_ORIGIN__"
       ACTUATOR_ENDPOINTS: health,info,metrics,prometheus
       JWT_SECRET_KEY: $${JWT_SECRET_KEY:?from Secrets Manager}
