@@ -10,6 +10,7 @@
 #   ${db_name}       — logical DB name (e.g. dmair)
 #   ${db_username}   — RDS app user (e.g. dmair_app)
 #   ${domain}        — public hostname (e.g. staging-api.flydmair.com)
+#   ${frontend_origin} — staging dashboard SPA origin for CORS (e.g. https://staging-dashboard.flydmair.com)
 #
 # Mirrors DMAir/dmair-backend/deployment/staging/STAGING-DEPLOYMENT.md
 # §6.1 + §6.2 + §10.13. Writes docker-compose.staging.yml + Caddyfile +
@@ -83,7 +84,7 @@ services:
       MAIL_FROM: no-reply@flydmair.com
       APP_URL: "https://__DOMAIN__"
       FRONTEND_BASE_URL: "https://__DOMAIN__"
-      CORS_ALLOWED_ORIGINS: "https://__DOMAIN__"
+      CORS_ALLOWED_ORIGINS: "__FRONTEND_ORIGIN__"
       ACTUATOR_ENDPOINTS: health,info,metrics,prometheus
       JWT_SECRET_KEY: $${JWT_SECRET_KEY:?from Secrets Manager}
       DB_PASSWORD: $${DB_PASSWORD:?from Secrets Manager}
@@ -140,6 +141,7 @@ sed -i \
     -e "s|__DB_NAME__|${db_name}|g" \
     -e "s|__DB_USERNAME__|${db_username}|g" \
     -e "s|__DOMAIN__|${domain}|g" \
+    -e "s|__FRONTEND_ORIGIN__|${frontend_origin}|g" \
     /opt/dmair/docker-compose.staging.yml
 
 # ---- Caddyfile -----------------------------------------------------------

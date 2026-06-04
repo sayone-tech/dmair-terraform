@@ -30,14 +30,15 @@ resource "aws_instance" "app" {
   }
 
   user_data = templatefile("${path.module}/user-data.sh", {
-    aws_region   = var.aws_region
-    secret_id    = aws_secretsmanager_secret.app.name
-    app_image    = var.app_image
-    ecr_registry = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
-    db_endpoint  = aws_db_instance.postgres.address
-    db_name      = var.db_name
-    db_username  = var.db_username
-    domain       = var.staging_domain
+    aws_region      = var.aws_region
+    secret_id       = aws_secretsmanager_secret.app.name
+    app_image       = var.app_image
+    ecr_registry    = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
+    db_endpoint     = aws_db_instance.postgres.address
+    db_name         = var.db_name
+    db_username     = var.db_username
+    domain          = var.staging_domain
+    frontend_origin = var.staging_frontend_origin
   })
 
   tags = {
