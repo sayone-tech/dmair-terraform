@@ -5,7 +5,7 @@
 
 resource "aws_secretsmanager_secret" "app" {
   name        = "dmair/staging/app"
-  description = "dmair-backend staging consolidated app secret (JWT, DB password, Mail password, admin bootstrap)"
+  description = "dmair-backend staging consolidated app secret (JWT, DB password, Mail password, admin bootstrap, ingest OAuth)"
 
   tags = {
     Name = "dmair-staging-app-secret"
@@ -20,5 +20,9 @@ resource "aws_secretsmanager_secret_version" "app" {
     DB_PASSWORD              = data.aws_ssm_parameter.db_password.value
     MAIL_PASSWORD            = data.aws_ssm_parameter.mail_password.value
     ADMIN_BOOTSTRAP_PASSWORD = data.aws_ssm_parameter.admin_bootstrap_password.value
+
+    INGEST_OAUTH_GOOGLE_CLIENT_ID     = data.aws_ssm_parameter.ingest_oauth_google_client_id.value
+    INGEST_OAUTH_GOOGLE_CLIENT_SECRET = data.aws_ssm_parameter.ingest_oauth_google_client_secret.value
+    INGEST_OAUTH_GOOGLE_REDIRECT_URI  = "https://${var.staging_domain}/api/v1/admin/mailbox/oauth-callback"
   })
 }
