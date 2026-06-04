@@ -89,9 +89,9 @@ variable "db_backup_retention_days" {
 # --- App image ------------------------------------------------------------
 
 variable "app_image" {
-  description = "Full ECR image URI incl. tag (e.g. 071297531943.dkr.ecr.us-west-2.amazonaws.com/dmair-backend:<sha>). First apply may use 'staging-latest' before the first image is pushed."
+  description = "Full ECR image URI incl. tag (e.g. 071297531943.dkr.ecr.us-west-2.amazonaws.com/dmair-backend:<sha>). Default targets the current staging-latest tag so a no-tfvars apply (CI) pulls a valid image; override with a pinned :<sha> for deterministic deploys."
   type        = string
-  default     = "staging-latest"
+  default     = "071297531943.dkr.ecr.us-west-2.amazonaws.com/dmair-backend:staging-latest"
 }
 
 # --- Domain ---------------------------------------------------------------
