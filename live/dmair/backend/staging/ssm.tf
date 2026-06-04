@@ -1,5 +1,12 @@
 # SSM Parameter Store — single source of truth for the sensitive values.
 #
+# GUARDRAIL (STATE.md 'Lessons & Guardrails' #2): secrets.tf rebuilds the
+# consolidated dmair/staging/app secret from these params on EVERY apply, so any
+# hand-edit to the Secrets Manager secret is reverted. Each param below MUST hold
+# the REAL value — a placeholder here silently ships to the app on the next
+# apply. (2026-06-04: mail_password was left a placeholder while the real
+# SendGrid key lived only in the secret; an apply clobbered it → SMTP 535.)
+#
 # Out-of-band setup (ops, one-time per environment):
 #   aws ssm put-parameter --type SecureString --tier Standard --region us-west-2 \
 #       --name /dmair/staging/db_password              --value "<gen>"
