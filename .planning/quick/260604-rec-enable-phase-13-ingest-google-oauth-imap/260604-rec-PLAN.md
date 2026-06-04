@@ -20,7 +20,7 @@ All edits live under `live/dmair/backend/staging/` plus the shared policy templa
 
 ## Verified facts (read before planning)
 
-- Domain variable is `var.staging_domain` (default `api-staging.flydmair.com`) — NOT `domain`.
+- Domain variable is `var.staging_domain` (default `staging-api.flydmair.com`) — NOT `domain`.
 - `data "aws_caller_identity" "current" {}` already exists at `live/.../staging/ec2.tf:68` —
   do NOT re-declare. ARNs are built as `${data.aws_caller_identity.current.account_id}` +
   `${var.aws_region}` (see ec2.tf:36).

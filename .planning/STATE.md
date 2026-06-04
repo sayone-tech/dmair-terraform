@@ -49,7 +49,7 @@ Plan: 6 of 6 (all six plans code-only-complete)
 ### Key Decisions (carried from PROJECT.md)
 
 - **Region:** `us-west-2` for all stacks (existing + new staging). EC2 `prevent_destroy = true` blocks a region migration.
-- **Backend staging DNS:** `api-staging.flydmair.com` — avoids collision with existing `staging.flydmair.com` (frontend CloudFront).
+- **Backend staging DNS:** `staging-api.flydmair.com` — avoids collision with existing `staging.flydmair.com` (frontend CloudFront).
 - **Layout:** `live/dmair/<component>/<env>` — project-keyed under `dmair`, matches existing AWS profile name.
 - **Account topology:** single shared `dmair` AWS account; isolation deferred. OIDC scoping in Phase 3 must keep dmair-backend CI from reaching CMS/frontend resources.
 - **Bootstrap stack:** `terraform import` the existing `dmair-terraform-prod` bucket — state backend becomes self-describing IaC. No DynamoDB lock table; locking uses Terraform 1.10+'s S3-native `use_lockfile = true` (decided 2026-05-20, quick-task 260520-ntp).
@@ -78,7 +78,7 @@ None. Phase 1 has no upstream dependency.
 - **EC2 `prevent_destroy = true`** on Strapi instance — any refactor must preserve the existing resource address (use `moved {}` blocks). Phase 2 risk.
 - **No state locking today** — README mentions `terraform-state-lock` but no `backend.tf` declares any locking mechanism. Concurrent applies from two operators would corrupt state. Phase 1 closes this via S3-native `use_lockfile = true`.
 - **Single shared AWS account** — OIDC role for dmair-backend CI (Phase 3) must be tag/prefix-scoped to deny existing `cms-*` / `frontend-*` resources. Verified by explicit deny-by-exclusion test.
-- **Cross-repo contract:** `api-staging.flydmair.com` DNS name and OIDC role name are consumed by `dmair-backend`. Renaming them later is expensive.
+- **Cross-repo contract:** `staging-api.flydmair.com` DNS name and OIDC role name are consumed by `dmair-backend`. Renaming them later is expensive.
 
 ## Session Continuity
 

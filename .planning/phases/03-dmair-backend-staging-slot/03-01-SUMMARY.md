@@ -41,7 +41,7 @@ status: code-only-complete
 
 1. **Provide the four sensitive vars** via `staging.auto.tfvars` (gitignored — see `staging.auto.tfvars.example`) or `TF_VAR_*` in CI. `terraform plan` won't run without them.
 2. **First-image chicken/egg:** the EC2 systemd unit fails its first start because the dmair-backend ECR repo has no image yet. Expected. Operator pushes the first ARM64 image then re-runs `sudo systemctl restart dmair-staging.service` via SSM.
-3. **DNS at GoDaddy:** terraform output `elastic_ip` → operator creates `A api-staging.flydmair.com → <ip>` in the GoDaddy DNS panel **before** Caddy attempts ACME issuance. Without DNS, Caddy can't get a Let's Encrypt cert and the app is unreachable.
+3. **DNS at GoDaddy:** terraform output `elastic_ip` → operator creates `A staging-api.flydmair.com → <ip>` in the GoDaddy DNS panel **before** Caddy attempts ACME issuance. Without DNS, Caddy can't get a Let's Encrypt cert and the app is unreachable.
 4. **§8.1(b) AdminBootstrapRunner blocker** from the spec — the create-or-activate admin bootstrap mode is not yet implemented in dmair-backend. Phase 3 ships the IaC; the admin bootstrap is the dmair-backend repo's responsibility.
 
 ## Hard invariant maintained

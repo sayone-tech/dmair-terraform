@@ -46,14 +46,14 @@
 **Plans:** TBD
 
 ### Phase 3: dmair-backend Staging Slot
-**Goal:** A dmair-backend staging stack is deployable into `live/dmair/backend/staging/` under `api-staging.flydmair.com`, and the GitHub OIDC role that drives it can only touch staging-scoped resources — not CMS or frontend.
+**Goal:** A dmair-backend staging stack is deployable into `live/dmair/backend/staging/` under `staging-api.flydmair.com`, and the GitHub OIDC role that drives it can only touch staging-scoped resources — not CMS or frontend.
 **Mode:** mvp
 **Depends on:** Phase 2 (the `live/dmair/staging/` slot must exist)
 **Requirements:** STAGING-01, STAGING-02, STAGING-03
 **Success Criteria** (what must be TRUE):
   1. `terraform apply` in `live/dmair/backend/staging/` provisions the full staging stack per STAGING-01 (VPC + 2 public subnets + IGW, EC2 `t4g.medium` + Elastic IP, EC2 instance role, security groups, RDS `db.t4g.micro` + PostGIS, ECR repo, consolidated Secrets Manager secret, CloudWatch log group, AWS Budget alarm) and exits 0; a follow-up `terraform plan` in the same directory reports "No changes".
   2. Existing live stacks remain untouched: `terraform plan` in `live/dmair/strapi/prod`, `live/dmair/frontend/prod`, and `live/dmair/frontend/staging` each still report "No changes" after the staging backend is applied.
-  3. `dig +short api-staging.flydmair.com` resolves to the staging backend's Elastic IP address; `curl -sS https://api-staging.flydmair.com` returns a non-TLS-error response (cert acquirable from the EC2 host via Let's Encrypt / Caddy).
+  3. `dig +short staging-api.flydmair.com` resolves to the staging backend's Elastic IP address; `curl -sS https://staging-api.flydmair.com` returns a non-TLS-error response (cert acquirable from the EC2 host via Let's Encrypt / Caddy).
   4. The GitHub OIDC role for `dmair-backend` CI can read/write resources under `live/dmair/staging/*` (operator verifies: assume the role and `aws s3 ls` against the staging backend's bucket succeeds).
   5. Deny-by-exclusion verified: the same OIDC role, when used to attempt `aws s3api get-bucket-policy --bucket <cms-media-bucket>` or modify a `frontend-*` resource, is rejected with an `AccessDenied` / `not authorized` error. The role cannot reach existing `cms-*` / `frontend-*` resources in the shared `dmair` account.
 **Plans:** TBD

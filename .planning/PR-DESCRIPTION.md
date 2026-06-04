@@ -69,10 +69,10 @@ Per-phase walkthrough: [.planning/phases/02-refactor-to-live-layout/DEVOPS-HANDO
 - [ ] Generate four sensitive values: `db_password`, `jwt_secret_key` (≥64 chars), `mail_password` (SendGrid API key), `admin_bootstrap_password`. Provide via `staging.auto.tfvars` (gitignored) or `TF_VAR_*`.
 - [ ] `cd live/dmair/staging/backend && terraform init && terraform apply` (~10–15 min).
 - [ ] Capture outputs (EIP, instance_id, ECR URL, OIDC role ARN).
-- [ ] **GoDaddy:** add A record `api-staging.flydmair.com` → EIP. Must exist **before** Caddy's first ACME attempt.
+- [ ] **GoDaddy:** add A record `staging-api.flydmair.com` → EIP. Must exist **before** Caddy's first ACME attempt.
 - [ ] Build + push first ARM64 image (from `dmair-backend` repo) to the new ECR repo.
 - [ ] SSM into EC2; `sudo systemctl restart dmair-staging.service`. Tail logs.
-- [ ] Smoke test: `curl https://api-staging.flydmair.com/actuator/health`.
+- [ ] Smoke test: `curl https://staging-api.flydmair.com/actuator/health`.
 - [ ] Admin bootstrap (BLOCKED on `dmair-backend` §8.1(b) — see cross-repo below).
 - [ ] **STAGING-03 deny-by-exclusion:** assume `dmair-backend-staging-deploy` role; confirm allows on staging ARNs + AccessDenied on `cms-*`/`frontend-*`/`strapi-*`.
 - [ ] Fill `VERIFICATION.md`; `/gsd-transition`.
