@@ -67,6 +67,16 @@ replacement. Worked on branch `feat/staging-ingest-oauth`, atomic commits, NOT a
 - Local `live/dmair/backend/staging/.terraform.lock.hcl` was created by `terraform init` during
   validation; left untracked (out of scope).
 
+## Addendum — pre-existing OIDC budgets fix (folded in per user direction)
+
+CI's plan on the branch surfaced an unrelated, pre-existing failure:
+`budgets:ListTagsForResource` AccessDenied on the `dmair-terraform-plan-readonly` role when the
+provider refreshes `aws_budgets_budget` (`budget.tf`, not touched by this task). The refresh block
+granted `budgets:Describe*` + `budgets:View*` but not the tag-listing action. Added
+`budgets:ListTagsForResource` to all three OIDC policy templates (plan-readonly, staging-apply,
+prod-apply — the apply roles embed the same refresh block, so apply would hit the same error).
+Commit `853efb2`. Requires ops to re-apply the inline policies (`put-role-policy`, idempotent).
+
 ## Operator follow-ups (apply-time, NOT terraform)
 
 1. Set the two SSM SecureString params before apply:
@@ -76,3 +86,5 @@ replacement. Worked on branch `feat/staging-ingest-oauth`, atomic commits, NOT a
    Google OAuth client.
 3. After apply + redeploy: run Connect Mail on staging OR seed `dmair/ingest/google-refresh-token`
    by copying the existing dev token.
+4. Re-apply the three OIDC inline policies so the `budgets:ListTagsForResource` fix takes effect
+   (`aws iam put-role-policy ...`, idempotent — see docs/iam-oidc/README.md).
