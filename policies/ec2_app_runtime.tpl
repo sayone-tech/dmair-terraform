@@ -24,6 +24,17 @@
       "Resource": "${app_secret_arn}"
     },
     {
+      "Sid": "ManageIngestRefreshTokenSecret",
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:PutSecretValue",
+        "secretsmanager:CreateSecret",
+        "secretsmanager:DescribeSecret"
+      ],
+      "Resource": "${ingest_refresh_token_secret_arn}"
+    },
+    {
       "Sid": "WriteLogs",
       "Effect": "Allow",
       "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],

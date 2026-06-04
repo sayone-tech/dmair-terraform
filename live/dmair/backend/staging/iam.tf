@@ -25,6 +25,11 @@ module "ec2_runtime_policy" {
       ecr_repository_arn = aws_ecr_repository.app.arn
       app_secret_arn     = aws_secretsmanager_secret.app.arn
       log_group_arn      = aws_cloudwatch_log_group.staging.arn
+
+      # Phase 13 ingest refresh-token secret. MailboxSecretService creates this
+      # secret at first Connect, so Secrets Manager appends a random suffix —
+      # grant on a name-prefix wildcard ARN.
+      ingest_refresh_token_secret_arn = "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:dmair/ingest/google-refresh-token-*"
     }
   }
 
