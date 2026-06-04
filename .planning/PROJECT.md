@@ -54,8 +54,8 @@ delivered on top of that invariant, not at the cost of it.
 **dmair-backend staging slot:**
 
 - [ ] **STAGING-01**: `live/dmair/backend/staging/` directory provisioned (Caddy-fronted
-  EC2 or equivalent per dmair-backend Phase 9 plan) targeting `api-staging.flydmair.com`
-- [ ] **STAGING-02**: DNS A-record for `api-staging.flydmair.com` pointing at the
+  EC2 or equivalent per dmair-backend Phase 9 plan) targeting `staging-api.flydmair.com`
+- [ ] **STAGING-02**: DNS A-record for `staging-api.flydmair.com` pointing at the
   staging backend's Elastic IP; ACM/Let's Encrypt cert acquirable
 - [ ] **STAGING-03**: GitHub OIDC role + tag/prefix-scoped IAM policy that lets
   `dmair-backend` CI deploy into `live/dmair/staging/*` without being able to touch
@@ -72,7 +72,7 @@ delivered on top of that invariant, not at the cost of it.
   shared single-account `us-west-2` for simplicity + state-bucket reuse. Revisit only
   if blast-radius isolation becomes a real requirement
 - **Migrating `staging.flydmair.com` to a different name** — frontend staging keeps
-  the existing DNS; backend gets the new `api-staging.flydmair.com` name instead.
+  the existing DNS; backend gets the new `staging-api.flydmair.com` name instead.
   Touching live frontend DNS is unnecessary risk
 - **Relocating state keys** to match new folder layout — folder names move, state
   keys at `strapi/terraform.tfstate`, `frontend/staging/terraform.tfstate`,
@@ -119,7 +119,7 @@ numbering. Mapping:
 
 Cross-repo contracts (renaming any of these is expensive):
 
-- DNS name: `api-staging.flydmair.com` (terraform repo provisions/registers; dmair-backend Caddy claims certs against it)
+- DNS name: `staging-api.flydmair.com` (terraform repo provisions/registers; dmair-backend Caddy claims certs against it)
 - OIDC role for `dmair-backend` CI: name + ARN documented in `OIDC.md` (Phase 4), consumed by `dmair-backend/.github/workflows/deploy-staging.yml`
 - ECR repository name + URI: output by Phase 3 staging stack, consumed by the dmair-backend image push step
 - Consolidated Secrets Manager secret name: output by Phase 3, consumed by the dmair-backend EC2 user-data launcher
@@ -139,7 +139,7 @@ the same PR cycle.
   after every Phase 9 commit. This is the gate, not the goal
 - **No managed test suite** — quality comes from `terraform plan` diffs reviewed by
   humans, plus the zero-change invariant. Introducing tooling is out of scope this milestone
-- **Cross-repo coordination:** `api-staging.flydmair.com` DNS + OIDC role names are
+- **Cross-repo coordination:** `staging-api.flydmair.com` DNS + OIDC role names are
   contracts the `dmair-backend` repo will consume. Renaming them later is expensive
 
 ## Key Decisions
@@ -147,7 +147,7 @@ the same PR cycle.
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | Region: `us-west-2` for new backend staging | Share account + state bucket with existing stacks; EC2 `prevent_destroy = true` blocks a region migration anyway | — Pending |
-| Backend staging DNS: `api-staging.flydmair.com` | `staging.flydmair.com` already pinned to frontend CloudFront; rename backend (cheap) instead of migrating frontend DNS (risky) | — Pending |
+| Backend staging DNS: `staging-api.flydmair.com` | `staging.flydmair.com` already pinned to frontend CloudFront; rename backend (cheap) instead of migrating frontend DNS (risky) | — Pending |
 | Layout: `live/dmair/<component>/<env>` | Project-keyed under the `dmair` umbrella matches the existing AWS profile name and the seed's reserved `live/dmair/staging` slot | — Pending |
 | Account topology: single shared AWS account | Existing reality; isolation deferred until there's a concrete need. Requires careful OIDC scoping for dmair-backend CI | — Pending |
 | Full bootstrap stack (import bucket + add lock table) | State backend becomes self-describing IaC; the lock table closes a real concurrent-apply hole | — Pending |

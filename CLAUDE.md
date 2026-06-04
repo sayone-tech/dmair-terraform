@@ -27,7 +27,7 @@ delivered on top of that invariant, not at the cost of it.
   after every Phase 9 commit. This is the gate, not the goal
 - **No managed test suite** — quality comes from `terraform plan` diffs reviewed by
   humans, plus the zero-change invariant. Introducing tooling is out of scope this milestone
-- **Cross-repo coordination:** `api-staging.flydmair.com` DNS + OIDC role names are
+- **Cross-repo coordination:** `staging-api.flydmair.com` DNS + OIDC role names are
   contracts the `dmair-backend` repo will consume. Renaming them later is expensive
 <!-- GSD:project-end -->
 

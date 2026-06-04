@@ -57,7 +57,7 @@ policies/            # reusable IAM policy templates (*.tpl)
 - STAGING-DEPLOYMENT.md §1 plans for the backend Caddy to acquire a Let's Encrypt cert
   for `staging.flydmair.com`, which requires the A-record to point at the backend's
   Elastic IP — directly contradicting the frontend staging assignment.
-- **Decision needed:** rename the backend target (e.g. `api-staging.flydmair.com`,
+- **Decision needed:** rename the backend target (e.g. `staging-api.flydmair.com`,
   `backend-staging.flydmair.com`), or migrate the frontend staging to a different name.
 
 ### Conflict 3: Folder rename `envs/` → `live/<project>/<environment>/`

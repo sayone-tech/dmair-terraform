@@ -12,7 +12,7 @@ status: complete
 
 ## File created
 
-- `live/dmair/staging/README.md` — placeholder describing the staging-environment slot, the conventions stacks under it follow, and the cross-repo contract with `dmair-backend` (DNS `api-staging.flydmair.com` + OIDC role scoped to `live/dmair/staging/*`).
+- `live/dmair/staging/README.md` — placeholder describing the staging-environment slot, the conventions stacks under it follow, and the cross-repo contract with `dmair-backend` (DNS `staging-api.flydmair.com` + OIDC role scoped to `live/dmair/staging/*`).
 
 Commit: `7de5aaa` `docs(REFACTOR-02): reserve live/dmair/staging/ slot for dmair-backend`.
 

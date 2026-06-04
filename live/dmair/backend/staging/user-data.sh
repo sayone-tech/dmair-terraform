@@ -9,7 +9,7 @@
 #   ${db_endpoint}   — RDS hostname (no port)
 #   ${db_name}       — logical DB name (e.g. dmair)
 #   ${db_username}   — RDS app user (e.g. dmair_app)
-#   ${domain}        — public hostname (e.g. api-staging.flydmair.com)
+#   ${domain}        — public hostname (e.g. staging-api.flydmair.com)
 #
 # Mirrors DMAir/dmair-backend/deployment/staging/STAGING-DEPLOYMENT.md
 # §6.1 + §6.2 + §10.13. Writes docker-compose.staging.yml + Caddyfile +

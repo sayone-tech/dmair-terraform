@@ -23,7 +23,7 @@
 
 ### Staging — dmair-backend Slot
 
-- [ ] **STAGING-01**: `live/dmair/backend/staging/` Terraform stack provisions the full staging AWS resource set per `dmair-backend/deployment/staging/STAGING-DEPLOYMENT.md` §10. Targets `api-staging.flydmair.com`. Required components:
+- [ ] **STAGING-01**: `live/dmair/backend/staging/` Terraform stack provisions the full staging AWS resource set per `dmair-backend/deployment/staging/STAGING-DEPLOYMENT.md` §10. Targets `staging-api.flydmair.com`. Required components:
   - **Networking:** VPC + 2 public subnets across 2 AZs + IGW + route tables (per STAGING-DEPLOYMENT.md §3.1)
   - **Compute:** EC2 `t4g.medium` (Ubuntu 24.04 LTS ARM64) + Elastic IP + EBS encryption at rest
   - **IAM:** EC2 instance role with: SSM Session Manager, ECR pull, Secrets Manager read, CloudWatch logs write
@@ -34,7 +34,7 @@
   - **Logs:** CloudWatch log group `/dmair/staging`, 5-day retention
   - **Cost guard:** AWS Budgets monthly threshold + email notification for this staging stack
   - **Out of scope for this requirement:** EC2 user-data (docker-compose launcher), Caddy config, the dmair-backend image itself — those are dmair-backend ART-* requirements, not terraform.
-- [ ] **STAGING-02**: A DNS A-record for `api-staging.flydmair.com` points at the staging backend's Elastic IP. An ACM/Let's Encrypt cert for that hostname is acquirable from the EC2 host.
+- [ ] **STAGING-02**: A DNS A-record for `staging-api.flydmair.com` points at the staging backend's Elastic IP. An ACM/Let's Encrypt cert for that hostname is acquirable from the EC2 host.
 - [ ] **STAGING-03**: A GitHub OIDC IAM role + tag/prefix-scoped IAM policy lets `dmair-backend` CI deploy into `live/dmair/staging/*` without being able to mutate existing `cms-*` / `frontend-*` resources in the shared `dmair` AWS account. Scoping is verified by an explicit deny-by-exclusion test (CI role attempts to read or modify a frontend resource and is rejected).
 
 ### CI/CD — Terraform Pipeline
@@ -66,7 +66,7 @@ Deferred to future milestones — tracked but not in this roadmap.
 |---------|--------|
 | `us-east-1` region for any stack | EC2 `prevent_destroy = true` blocks a region migration; shared `us-west-2` is cheaper and simpler |
 | Separate AWS account for dmair-backend | Single shared `dmair` account is existing reality; isolation deferred until concrete need arises |
-| Migrating `staging.flydmair.com` to a different name | Backend gets `api-staging.flydmair.com` instead — touching live frontend DNS is unnecessary risk |
+| Migrating `staging.flydmair.com` to a different name | Backend gets `staging-api.flydmair.com` instead — touching live frontend DNS is unnecessary risk |
 | Relocating state keys during the folder rename | Keep state keys at current paths to avoid per-stack `terraform state mv` migrations. Tracked as v2 STATE-01 |
 | `terratest` / `checkov` / `tfsec` introduction | Out of this milestone. Quality gating is the zero-change-plan invariant. Tracked as v2 QA-* |
 | Production deployment slot for dmair-backend | Staging only this milestone. Tracked as v2 PROD-01 |

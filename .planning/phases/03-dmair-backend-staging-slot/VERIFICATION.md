@@ -72,10 +72,10 @@ TODO_DEVOPS: paste four No-changes outputs (one per stack).
 
 ## STAGING-02b — DNS resolves to the staging backend EIP
 
-After the operator creates the A record at GoDaddy (`api-staging.flydmair.com` → EIP from terraform output):
+After the operator creates the A record at GoDaddy (`staging-api.flydmair.com` → EIP from terraform output):
 
 ```sh
-dig +short api-staging.flydmair.com
+dig +short staging-api.flydmair.com
 ```
 
 Expected: the same IP as `terraform output elastic_ip`.
@@ -87,7 +87,7 @@ TODO_DEVOPS: paste `dig +short` output. Confirm it matches `terraform output ela
 After the first image is pushed and Caddy obtains its Let's Encrypt cert:
 
 ```sh
-curl -sS -o /dev/null -w "%{http_code}\n" https://api-staging.flydmair.com/actuator/health
+curl -sS -o /dev/null -w "%{http_code}\n" https://staging-api.flydmair.com/actuator/health
 ```
 
 Expected: a non-TLS-error HTTP response (200/403/404 — anything that proves TLS works).

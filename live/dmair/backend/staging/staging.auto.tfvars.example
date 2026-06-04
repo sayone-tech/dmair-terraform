@@ -20,7 +20,7 @@
 # db_name                  = "dmair"
 # db_username              = "dmair_app"
 # db_backup_retention_days = 3
-# staging_domain           = "api-staging.flydmair.com"
+# staging_domain           = "staging-api.flydmair.com"
 # budget_monthly_cap_usd   = 60
 # budget_alert_email       = "ops@flydmair.com"
 

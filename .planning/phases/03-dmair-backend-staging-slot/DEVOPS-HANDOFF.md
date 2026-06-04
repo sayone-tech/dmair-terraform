@@ -56,7 +56,7 @@ aws ssm put-parameter --type SecureString --tier Standard --region "$REGION" \
 
 # admin_bootstrap_password — initial admin login (12-128 chars).
 # Save this to a password manager — you'll use it for the very first admin
-# login at https://api-staging.flydmair.com after the bootstrap container runs.
+# login at https://staging-api.flydmair.com after the bootstrap container runs.
 aws ssm put-parameter --type SecureString --tier Standard --region "$REGION" \
   --name /dmair/staging/admin_bootstrap_password \
   --value "$(LC_ALL=C tr -dc 'A-Za-z0-9!#%^&*_+-=' </dev/urandom | head -c 24)"
@@ -104,11 +104,11 @@ Log in to GoDaddy DNS for `flydmair.com`. Add or update:
 
 Verify:
 ```sh
-dig +short api-staging.flydmair.com
+dig +short staging-api.flydmair.com
 # must return the same IP as terraform output elastic_ip
 ```
 
-DNS must resolve BEFORE the first request to `api-staging.flydmair.com` — otherwise Caddy can't complete its ACME (Let's Encrypt) challenge and the cert won't issue.
+DNS must resolve BEFORE the first request to `staging-api.flydmair.com` — otherwise Caddy can't complete its ACME (Let's Encrypt) challenge and the cert won't issue.
 
 ### Step 5 — Push the first dmair-backend image to ECR
 
@@ -146,7 +146,7 @@ Watch the logs for ECR pull + container start. Caddy will spin up and request th
 
 ```sh
 # Should return 200 with {"status":"UP"} once Caddy has the cert
-curl -sS https://api-staging.flydmair.com/actuator/health
+curl -sS https://staging-api.flydmair.com/actuator/health
 ```
 
 ### Step 8 — Bootstrap the first admin (spec §6.3)
