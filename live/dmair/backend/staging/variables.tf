@@ -102,6 +102,12 @@ variable "staging_domain" {
   default     = "staging-api.flydmair.com"
 }
 
+variable "staging_frontend_origin" {
+  description = "Browser origin of the staging dashboard SPA that calls the backend API (CORS)."
+  type        = string
+  default     = "https://staging-dashboard.flydmair.com"
+}
+
 # --- Cost alarm -----------------------------------------------------------
 
 variable "budget_monthly_cap_usd" {
