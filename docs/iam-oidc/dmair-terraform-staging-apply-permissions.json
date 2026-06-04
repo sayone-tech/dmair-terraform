@@ -52,6 +52,7 @@
         "acm:List*",
         "budgets:Describe*",
         "budgets:View*",
+        "budgets:ListTagsForResource",
         "sts:GetCallerIdentity"
       ],
       "Resource": "*"
@@ -89,7 +90,7 @@
       ],
       "Resource": "*",
       "Condition": {
-        "StringEquals": { "aws:RequestTag/Environment": "staging" }
+        "StringEqualsIfExists": { "aws:RequestTag/Environment": "staging" }
       }
     },
     {
@@ -118,7 +119,8 @@
         "secretsmanager:Put*",
         "secretsmanager:Restore*",
         "secretsmanager:TagResource",
-        "secretsmanager:UntagResource"
+        "secretsmanager:UntagResource",
+        "secretsmanager:GetSecretValue"
       ],
       "Resource": "arn:aws:secretsmanager:us-west-2:ACCOUNT_ID:secret:dmair/staging/*"
     },
@@ -165,11 +167,16 @@
         "iam:DeleteInstanceProfile",
         "iam:AddRoleToInstanceProfile",
         "iam:RemoveRoleFromInstanceProfile",
+        "iam:TagInstanceProfile",
+        "iam:UntagInstanceProfile",
         "iam:CreatePolicy",
         "iam:DeletePolicy",
         "iam:CreatePolicyVersion",
         "iam:DeletePolicyVersion",
-        "iam:SetDefaultPolicyVersion"
+        "iam:SetDefaultPolicyVersion",
+        "iam:TagPolicy",
+        "iam:UntagPolicy",
+        "iam:PassRole"
       ],
       "Resource": [
         "arn:aws:iam::ACCOUNT_ID:role/dmair-staging-*",
@@ -185,7 +192,9 @@
       "Action": [
         "budgets:CreateBudget",
         "budgets:ModifyBudget",
-        "budgets:DeleteBudget"
+        "budgets:DeleteBudget",
+        "budgets:TagResource",
+        "budgets:UntagResource"
       ],
       "Resource": "arn:aws:budgets::ACCOUNT_ID:budget/dmair-staging-*"
     },
@@ -197,6 +206,17 @@
       "Condition": {
         "StringEquals": {
           "kms:ViaService": "ssm.us-west-2.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Sid": "AllowRdsServiceLinkedRole",
+      "Effect": "Allow",
+      "Action": "iam:CreateServiceLinkedRole",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "iam:AWSServiceName": "rds.amazonaws.com"
         }
       }
     }

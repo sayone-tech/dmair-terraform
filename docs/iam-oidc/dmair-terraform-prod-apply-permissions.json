@@ -52,6 +52,7 @@
         "acm:List*",
         "budgets:Describe*",
         "budgets:View*",
+        "budgets:ListTagsForResource",
         "sts:GetCallerIdentity"
       ],
       "Resource": "*"
@@ -143,7 +144,8 @@
         "secretsmanager:Put*",
         "secretsmanager:Restore*",
         "secretsmanager:TagResource",
-        "secretsmanager:UntagResource"
+        "secretsmanager:UntagResource",
+        "secretsmanager:GetSecretValue"
       ],
       "Resource": "*"
     },
@@ -165,11 +167,16 @@
         "iam:DeleteInstanceProfile",
         "iam:AddRoleToInstanceProfile",
         "iam:RemoveRoleFromInstanceProfile",
+        "iam:TagInstanceProfile",
+        "iam:UntagInstanceProfile",
         "iam:CreatePolicy",
         "iam:DeletePolicy",
         "iam:CreatePolicyVersion",
         "iam:DeletePolicyVersion",
         "iam:SetDefaultPolicyVersion",
+        "iam:TagPolicy",
+        "iam:UntagPolicy",
+        "iam:PassRole",
         "iam:CreateUser",
         "iam:DeleteUser",
         "iam:UpdateUser",
