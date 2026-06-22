@@ -70,6 +70,12 @@ services:
     environment: &app-env
       SPRING_PROFILE: staging
       SERVER_PORT: "8080"
+      # JVM heap. Tuning only (not load-bearing — the Dockerfile ENTRYPOINT
+      # already defaults APP_HEAP_MIN=512m / APP_HEAP_MAX=1g). Override the max
+      # upward for headroom on the t4g.medium's 4 GB, leaving room for valkey,
+      # caddy and the OS. Inherited by admin-bootstrap via `<<: *app-env`.
+      APP_HEAP_MIN: "512m"
+      APP_HEAP_MAX: "1536m"
       DB_URL: "jdbc:postgresql://__DB_ENDPOINT__:5432/__DB_NAME__"
       DB_USERNAME: __DB_USERNAME__
       REDIS_HOST: valkey
