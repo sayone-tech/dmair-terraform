@@ -28,18 +28,27 @@
       "Resource": "arn:aws:secretsmanager:us-west-2:ACCOUNT_ID:secret:dmair/staging/app-*"
     },
     {
-      "Sid": "SsmDeployRollEc2",
+      "Sid": "SsmSendCommandScopedToStagingEc2",
       "Effect": "Allow",
       "Action": [
         "ssm:SendCommand",
-        "ssm:StartSession",
-        "ssm:DescribeInstanceInformation",
-        "ssm:GetCommandInvocation"
+        "ssm:StartSession"
       ],
       "Resource": [
         "arn:aws:ec2:us-west-2:ACCOUNT_ID:instance/STAGING_EC2_INSTANCE_ID",
         "arn:aws:ssm:us-west-2::document/AWS-RunShellScript"
       ]
+    },
+    {
+      "Sid": "SsmReadOnlyCommandLookups",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:GetCommandInvocation",
+        "ssm:DescribeInstanceInformation",
+        "ssm:ListCommandInvocations",
+        "ssm:ListCommands"
+      ],
+      "Resource": "*"
     }
   ]
 }
