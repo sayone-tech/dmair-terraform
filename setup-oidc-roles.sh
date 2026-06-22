@@ -145,7 +145,7 @@ ssm_create_if_missing() {
   echo "  ${name}: created"
 }
 
-echo "==> Step 3: SSM SecureString parameters (4)"
+echo "==> Step 3: SSM SecureString parameters (6)"
 
 ssm_create_if_missing \
   "/dmair/staging/db_password" \
