@@ -86,6 +86,12 @@ services:
       FRONTEND_BASE_URL: "__FRONTEND_ORIGIN__"
       CORS_ALLOWED_ORIGINS: "__FRONTEND_ORIGIN__"
       ACTUATOR_ENDPOINTS: health,info,metrics,prometheus
+      # First-boot scheduler toggles — set explicitly so the first run's
+      # behavior is deliberate, not an app default. TRIP_QUOTE_EXPIRY_ENABLED's
+      # first run mass-closes historical past-date quotes to LOST; keep it OFF
+      # until that sweep is deliberately wanted after first observation.
+      TRIP_QUOTE_EXPIRY_ENABLED: "false"
+      TRIP_COMPLETION_ENABLED: "true"
       JWT_SECRET_KEY: $${JWT_SECRET_KEY:?from Secrets Manager}
       DB_PASSWORD: $${DB_PASSWORD:?from Secrets Manager}
       MAIL_PASSWORD: $${MAIL_PASSWORD:?from Secrets Manager}
