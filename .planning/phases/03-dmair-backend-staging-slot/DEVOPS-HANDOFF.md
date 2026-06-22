@@ -29,7 +29,7 @@
 
 ### Step 1 — Populate sensitive values in SSM Parameter Store
 
-The 4 sensitive values (`db_password`, `jwt_secret_key`, `mail_password`, `admin_bootstrap_password`) are **NOT** Terraform variables and **NOT** GitHub Secrets. They live in AWS Systems Manager Parameter Store as `SecureString` parameters and are read at `terraform plan` / `apply` time via `data "aws_ssm_parameter"` blocks in `ssm.tf`.
+The 6 sensitive values (`db_password`, `jwt_secret_key`, `mail_password`, `admin_bootstrap_password`, plus the Phase 13 ingest pair `ingest_oauth_google_client_id` and `ingest_oauth_google_client_secret`) are **NOT** Terraform variables and **NOT** GitHub Secrets. They live in AWS Systems Manager Parameter Store as `SecureString` parameters and are read at `terraform plan` / `apply` time via `data "aws_ssm_parameter"` blocks in `ssm.tf`. **All six must exist before the first `terraform plan`** — a missing parameter fails the plan on its data source. (`setup-oidc-roles.sh` Step 3 seeds them idempotently, the ingest pair as `PENDING_REPLACE_*` placeholders you must rotate to the real Google OAuth client; the commands below create them directly.)
 
 Create them once (or after rotation) per environment:
 
@@ -60,6 +60,18 @@ aws ssm put-parameter --type SecureString --tier Standard --region "$REGION" \
 aws ssm put-parameter --type SecureString --tier Standard --region "$REGION" \
   --name /dmair/staging/admin_bootstrap_password \
   --value "$(LC_ALL=C tr -dc 'A-Za-z0-9!#%^&*_+-=' </dev/urandom | head -c 24)"
+
+# ingest_oauth_google_client_id / _client_secret — Phase 13 mailbox ingest.
+# The SAME Google OAuth client used by local-dev. Get from Google Cloud Console
+# → APIs & Services → Credentials → your OAuth 2.0 Client ID. Required before
+# the first `terraform plan` (ssm.tf reads both as data sources).
+aws ssm put-parameter --type SecureString --tier Standard --region "$REGION" \
+  --name /dmair/staging/ingest_oauth_google_client_id \
+  --value "<paste-google-oauth-client-id>"
+
+aws ssm put-parameter --type SecureString --tier Standard --region "$REGION" \
+  --name /dmair/staging/ingest_oauth_google_client_secret \
+  --value "<paste-google-oauth-client-secret>"
 ```
 
 To **rotate** any of them later: same command with `--overwrite`. After rotation, run `terraform apply` to refresh the Secrets Manager secret (which the dmair-backend app reads at container start). For `db_password` specifically, also `-target=aws_db_instance.postgres` apply will push the new password to RDS.
