@@ -15,6 +15,28 @@ resource "aws_secretsmanager_secret" "app" {
 resource "aws_secretsmanager_secret_version" "app" {
   secret_id = aws_secretsmanager_secret.app.id
 
+  # Guardrail (STATE.md 'Lessons & Guardrails' #2): this secret is rebuilt from
+  # SSM on every apply, so a placeholder left in any source param silently ships
+  # to the app. ssm.tf's data sources fail loud when a param is MISSING, but not
+  # when it holds a PENDING_REPLACE_* sentinel (setup-oidc-roles.sh seeds
+  # mail_password + the ingest pair as placeholders). Fail the plan hard if any
+  # source value still looks like a placeholder — keep the failure loud.
+  lifecycle {
+    precondition {
+      condition = alltrue([
+        for v in [
+          data.aws_ssm_parameter.jwt_secret_key.value,
+          data.aws_ssm_parameter.db_password.value,
+          data.aws_ssm_parameter.mail_password.value,
+          data.aws_ssm_parameter.admin_bootstrap_password.value,
+          data.aws_ssm_parameter.ingest_oauth_google_client_id.value,
+          data.aws_ssm_parameter.ingest_oauth_google_client_secret.value,
+        ] : !can(regex("PENDING_REPLACE", v))
+      ])
+      error_message = "A /dmair/staging/* SSM parameter still holds a PENDING_REPLACE_* placeholder. Rotate it to the real value (aws ssm put-parameter --overwrite ...) before applying — otherwise the placeholder is written into the dmair/staging/app secret and the app boots broken (STATE.md guardrail #2)."
+    }
+  }
+
   secret_string = jsonencode({
     JWT_SECRET_KEY           = data.aws_ssm_parameter.jwt_secret_key.value
     DB_PASSWORD              = data.aws_ssm_parameter.db_password.value
