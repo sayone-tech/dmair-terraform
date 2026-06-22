@@ -55,7 +55,7 @@ cd docs/iam-oidc
 
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 TF_ORG_REPO="sayone-tech/dmair-terraform"        # this repo
-BACKEND_ORG_REPO="sayone-tech/dmair-backend"     # cross-repo contract
+BACKEND_ORG_REPO="DM-Air/dmair-backend"          # cross-repo contract — DIFFERENT org from this repo. The OIDC token sub is repo:DM-Air/dmair-backend:ref:refs/heads/staging, so this MUST be DM-Air or the deploy role's trust never matches (configure-aws-credentials fails at deploy step 1). Do not "align" it to the terraform repo's org.
 STAGING_EC2_INSTANCE_ID="i-PLACEHOLDER"          # fill in AFTER applying live/dmair/backend/staging (Phase 3)
 
 mkdir -p /tmp/iam-oidc
