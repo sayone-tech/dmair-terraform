@@ -30,7 +30,12 @@ echo "Caller identity: $CALLER_ARN"
 echo
 
 TF_ORG_REPO="sayone-tech/dmair-terraform"
-BACKEND_ORG_REPO="sayone-tech/dmair-backend"
+# Backend repo lives under the DM-Air org (github.com/DM-Air/dmair-backend). The
+# GitHub OIDC token's `sub` is repo:DM-Air/dmair-backend:ref:refs/heads/staging,
+# so the deploy-role trust policy MUST match this org exactly or
+# configure-aws-credentials fails at deploy step 1. Do not "align" this to the
+# terraform repo's org — they are different orgs.
+BACKEND_ORG_REPO="DM-Air/dmair-backend"
 STAGING_EC2_INSTANCE_ID="${STAGING_EC2_INSTANCE_ID:-PENDING_PHASE_3_APPLY}"
 REGION=us-west-2
 
