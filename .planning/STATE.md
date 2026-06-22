@@ -72,6 +72,7 @@ None. Phase 1 has no upstream dependency.
 |---|-------------|------|--------|-----------|
 | 260520-ntp | Drop DynamoDB locking from Phase 1, use S3-native use_lockfile and bump Terraform pin to ~> 1.15 | 2026-05-20 | 015809f | [260520-ntp-drop-dynamodb-locking-from-phase-1-use-s](./quick/260520-ntp-drop-dynamodb-locking-from-phase-1-use-s/) |
 | 260604-rec | Enable Phase 13 ingest (Google OAuth/IMAP mailbox) on backend staging | 2026-06-04 | (see PR feat/staging-ingest-oauth) | [260604-rec-enable-phase-13-ingest-google-oauth-imap](./quick/260604-rec-enable-phase-13-ingest-google-oauth-imap/) |
+| 260622-dry | Staging-deploy readiness remediations (OIDC org→DM-Air, ingest SSM params, DeleteSecret, trip toggles, valkey doc, heap) — 3 live stacks verified No-changes | 2026-06-22 | (branch fix/staging-deploy-remediations) | [20260622-staging-deploy-remediations](./quick/20260622-staging-deploy-remediations/) |
 
 ### Risks Logged
 

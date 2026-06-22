@@ -49,7 +49,17 @@ resource "aws_instance" "app" {
     # AMI updates from Canonical's SSM parameter would otherwise trigger
     # instance replacement on every apply; ignore so changes only happen
     # via deliberate intervention.
-    ignore_changes = [ami]
+    #
+    # user_data is ignored after creation (matching the shared modules/ec2
+    # convention). It runs ONLY at first boot, and post-boot config is managed
+    # out-of-band (CI deploys via `systemctl restart dmair-staging.service`, not
+    # by re-running user_data). Without this, edits to user-data.sh show as a
+    # perpetual in-place diff that never actually reaches the running box; with
+    # user_data_replace_on_change defaulting to false the instance is updated
+    # in-place rather than replaced, but ignoring it removes the misleading drift
+    # entirely. To intentionally ship new user_data, rebuild the instance
+    # (taint / -replace) — a fresh launch always uses the current user-data.sh.
+    ignore_changes = [ami, user_data]
   }
 }
 

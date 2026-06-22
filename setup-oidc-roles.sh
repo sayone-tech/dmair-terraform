@@ -30,7 +30,12 @@ echo "Caller identity: $CALLER_ARN"
 echo
 
 TF_ORG_REPO="sayone-tech/dmair-terraform"
-BACKEND_ORG_REPO="sayone-tech/dmair-backend"
+# Backend repo lives under the DM-Air org (github.com/DM-Air/dmair-backend). The
+# GitHub OIDC token's `sub` is repo:DM-Air/dmair-backend:ref:refs/heads/staging,
+# so the deploy-role trust policy MUST match this org exactly or
+# configure-aws-credentials fails at deploy step 1. Do not "align" this to the
+# terraform repo's org — they are different orgs.
+BACKEND_ORG_REPO="DM-Air/dmair-backend"
 STAGING_EC2_INSTANCE_ID="${STAGING_EC2_INSTANCE_ID:-PENDING_PHASE_3_APPLY}"
 REGION=us-west-2
 
@@ -140,7 +145,7 @@ ssm_create_if_missing() {
   echo "  ${name}: created"
 }
 
-echo "==> Step 3: SSM SecureString parameters (4)"
+echo "==> Step 3: SSM SecureString parameters (6)"
 
 ssm_create_if_missing \
   "/dmair/staging/db_password" \
@@ -161,6 +166,24 @@ ssm_create_if_missing \
   "/dmair/staging/admin_bootstrap_password" \
   "$(LC_ALL=C tr -dc 'A-Za-z0-9!#%^&*_+=' </dev/urandom | head -c 24)" \
   "Initial admin bootstrap password for dmair-backend staging"
+
+# Phase 13 ingest (Google OAuth). ssm.tf reads these as data sources, so they
+# MUST exist before `terraform plan` on live/dmair/backend/staging. Seeded as
+# REPLACE placeholders here; rotate with the real Google OAuth client
+# credentials (the SAME OAuth client used by local-dev) via:
+#   aws ssm put-parameter --overwrite --type SecureString --region us-west-2 \
+#     --name /dmair/staging/ingest_oauth_google_client_id     --value "<client-id>"
+#   aws ssm put-parameter --overwrite --type SecureString --region us-west-2 \
+#     --name /dmair/staging/ingest_oauth_google_client_secret --value "<client-secret>"
+ssm_create_if_missing \
+  "/dmair/staging/ingest_oauth_google_client_id" \
+  "PENDING_REPLACE_WITH_GOOGLE_OAUTH_CLIENT_ID" \
+  "Google OAuth client id for ingest mailbox — REPLACE before app deploy"
+
+ssm_create_if_missing \
+  "/dmair/staging/ingest_oauth_google_client_secret" \
+  "PENDING_REPLACE_WITH_GOOGLE_OAUTH_CLIENT_SECRET" \
+  "Google OAuth client secret for ingest mailbox — REPLACE before app deploy"
 
 echo
 
@@ -232,6 +255,10 @@ echo "Pending manual ops (NOT covered by this script):"
 echo "  - Rotate /dmair/staging/mail_password with a real SendGrid API key:"
 echo "    aws ssm put-parameter --overwrite --type SecureString --region $REGION \\"
 echo "      --name /dmair/staging/mail_password --value '<real-api-key>'"
+echo "    (outbound email — activation/reset — fails until replaced)"
+echo "  - Rotate the two ingest OAuth placeholders with the real Google OAuth"
+echo "    client (same client as local-dev): /dmair/staging/ingest_oauth_google_client_id"
+echo "    and /dmair/staging/ingest_oauth_google_client_secret (use --overwrite)"
 echo "  - Configure 'prod' GitHub Environment with required reviewers"
 echo "    (Settings → Environments → New environment → prod)"
 echo "  - Enable branch protection on main, require 'terraform / Detect changed stacks'"

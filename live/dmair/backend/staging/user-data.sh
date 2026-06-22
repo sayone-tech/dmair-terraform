@@ -70,6 +70,12 @@ services:
     environment: &app-env
       SPRING_PROFILE: staging
       SERVER_PORT: "8080"
+      # JVM heap. Tuning only (not load-bearing — the Dockerfile ENTRYPOINT
+      # already defaults APP_HEAP_MIN=512m / APP_HEAP_MAX=1g). Override the max
+      # upward for headroom on the t4g.medium's 4 GB, leaving room for valkey,
+      # caddy and the OS. Inherited by admin-bootstrap via `<<: *app-env`.
+      APP_HEAP_MIN: "512m"
+      APP_HEAP_MAX: "1536m"
       DB_URL: "jdbc:postgresql://__DB_ENDPOINT__:5432/__DB_NAME__"
       DB_USERNAME: __DB_USERNAME__
       REDIS_HOST: valkey
@@ -86,6 +92,12 @@ services:
       FRONTEND_BASE_URL: "__FRONTEND_ORIGIN__"
       CORS_ALLOWED_ORIGINS: "__FRONTEND_ORIGIN__"
       ACTUATOR_ENDPOINTS: health,info,metrics,prometheus
+      # First-boot scheduler toggles — set explicitly so the first run's
+      # behavior is deliberate, not an app default. TRIP_QUOTE_EXPIRY_ENABLED's
+      # first run mass-closes historical past-date quotes to LOST; keep it OFF
+      # until that sweep is deliberately wanted after first observation.
+      TRIP_QUOTE_EXPIRY_ENABLED: "false"
+      TRIP_COMPLETION_ENABLED: "true"
       JWT_SECRET_KEY: $${JWT_SECRET_KEY:?from Secrets Manager}
       DB_PASSWORD: $${DB_PASSWORD:?from Secrets Manager}
       MAIL_PASSWORD: $${MAIL_PASSWORD:?from Secrets Manager}
@@ -101,6 +113,14 @@ services:
         awslogs-stream: app
 
   valkey:
+    # Accepted staging risk: no requirepass. valkey is reachable only on the
+    # internal docker network (no host port published, EC2 SG has no 6379
+    # ingress), and the app's REDIS_PASSWORD default is empty — both sides
+    # password-less, so they match and no NOAUTH occurs. If valkey is ever
+    # exposed beyond the instance, add `command: ["valkey-server",
+    # "--requirepass", "$${REDIS_PASSWORD}"]` AND set REDIS_PASSWORD in
+    # &app-env from the consolidated secret (they MUST match). valkey:8 is
+    # RESP-compatible with the Redis 7.4 baseline (app uses a Jedis pool).
     image: valkey/valkey:8
     restart: unless-stopped
     logging:

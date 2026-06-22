@@ -30,7 +30,8 @@
         "secretsmanager:GetSecretValue",
         "secretsmanager:PutSecretValue",
         "secretsmanager:CreateSecret",
-        "secretsmanager:DescribeSecret"
+        "secretsmanager:DescribeSecret",
+        "secretsmanager:DeleteSecret"
       ],
       "Resource": "${ingest_refresh_token_secret_arn}"
     },

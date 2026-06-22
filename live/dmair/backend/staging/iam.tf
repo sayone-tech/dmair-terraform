@@ -28,7 +28,11 @@ module "ec2_runtime_policy" {
 
       # Phase 13 ingest refresh-token secret. MailboxSecretService creates this
       # secret at first Connect, so Secrets Manager appends a random suffix —
-      # grant on a name-prefix wildcard ARN.
+      # grant on a name-prefix wildcard ARN. The rendered policy grants
+      # DeleteSecret in addition to Get/Put/Create/Describe because the app
+      # deletes this secret when a mailbox is disconnected; the runtime role
+      # therefore needs Delete on this prefix (the wildcard scopes it to the
+      # ingest secret only — never the consolidated dmair/staging/app secret).
       ingest_refresh_token_secret_arn = "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:dmair/ingest/google-refresh-token-*"
     }
   }
